@@ -1,0 +1,16 @@
+{
+ "_about": "Facts the drift monitor checks this repo's docs against. 'banned' = old names that must not appear in README/CLAUDE.md/STATUS.md/docs; 'allow' = files exempt; 'ignore' = checks that are intentional here.",
+ "repo": "cv-workbench",
+ "database": "none (browser state + the hub document store)",
+ "hosting": "OVH VPS (static, Caddy)",
+ "domain": "cv.gallab.top",
+ "url": "https://cv.gallab.top",
+ "services": [
+  "OpenAI-compatible API (optional, user key)"
+ ],
+ "banned": [],
+ "ignore": [
+  "readme: README does not mention"
+ ],
+ "_ignore_why": "The README does not name the live site, by decision (2026-10-21)."
+}

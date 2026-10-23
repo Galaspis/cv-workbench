@@ -1,0 +1,41 @@
+name: Deploy cv.gallab.top
+# Push to main → build → the server. Needs repo secrets VPS_SSH_KEY and VPS_HOST.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+concurrency: deploy
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - run: npm run build
+      - name: Join the private network (Tailscale)
+        uses: tailscale/github-action@v3
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
+      - name: SSH setup
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H "${{ secrets.VPS_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
+      - name: Sync build
+        env: { H: "${{ secrets.VPS_HOST }}" }
+        run: rsync -az --delete dist/ deploy@$H:/srv/cv/site/
+      - name: Caddy site
+        env: { H: "${{ secrets.VPS_HOST }}" }
+        run: |
+          scp -q deploy/cv.caddy deploy@$H:/tmp/cv.caddy
+          ssh deploy@$H 'sudo /usr/local/bin/caddy-site-install cv'
+      - name: Smoke test
+        run: |
+          code=$(curl -s -o /dev/null -m 15 -w "%{http_code}" https://cv.gallab.top/)
+          echo "cv.gallab.top → $code (401 = login gate, expected)"
+          test "$code" = "401"
