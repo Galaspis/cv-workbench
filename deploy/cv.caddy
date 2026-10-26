@@ -20,6 +20,16 @@ cv.gallab.top {
         request_header -Remote-Name
         request_header -Remote-Groups
 
+        # Brand files (logo, icons, manifest, fonts) are public: phones fetch them WITHOUT the
+        # login cookie when adding the app to the home screen, and would otherwise get a blank icon.
+        @public path /brand/*
+        handle @public {
+            root * /srv/cv/site
+            header Cache-Control "public, max-age=86400"
+            header /brand/site.webmanifest Content-Type "application/manifest+json"
+            file_server
+        }
+
         import auth
         import datastore
 

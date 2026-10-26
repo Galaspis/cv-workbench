@@ -8,9 +8,12 @@
  "services": [
   "OpenAI-compatible API (optional, user key)"
  ],
- "banned": [],
+ "banned": [
+  "CV Workbench"
+ ],
  "ignore": [
   "readme: README does not mention"
  ],
- "_ignore_why": "The README does not name the live site, by decision (2026-10-21)."
+ "_ignore_why": "The README does not name the live site, by decision (2026-10-21).",
+ "_renamed": "2026-10-26: the app is now called קורות (Korot). The repo name cv-workbench stays."
 }

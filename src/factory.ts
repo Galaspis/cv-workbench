@@ -8,6 +8,7 @@ import type {
   Settings,
 } from "./types";
 import { DEFAULT_SECTION_ORDER, DEFAULT_SIDEBAR_KEYS, DEFAULT_TITLES } from "./types";
+import { EN_TITLES, HE_TITLES } from "./i18n";
 
 export function uid() {
   return crypto.randomUUID();
@@ -84,6 +85,22 @@ export function createResume(partial?: Partial<Resume>): Resume {
     titles: { ...DEFAULT_TITLES },
     ...partial,
   };
+}
+
+/** What switching a CV between English and Hebrew changes: direction-related layout, section titles, fonts. */
+export function localePatch(locale: "en" | "he", titles: Record<string, string>): Partial<Resume> {
+  return locale === "he"
+    ? { locale: "he", sidebar: "right", titles: { ...titles, ...HE_TITLES }, titleFont: "Assistant", bodyFont: "Assistant" }
+    : { locale: "en", sidebar: "left", titles: { ...titles, ...EN_TITLES }, titleFont: "Calibri", bodyFont: "Calibri" };
+}
+
+/** A blank CV in the given language. */
+export function createLocalizedResume(locale: "en" | "he"): Resume {
+  const base = createResume({
+    title: locale === "he" ? "קורות חיים חדשים" : "Untitled resume",
+    skills: [{ id: uid(), name: "", items: "" }],
+  });
+  return { ...base, ...localePatch(locale, base.titles) };
 }
 
 export function createCoverLetter(resumeId = ""): CoverLetter {
@@ -210,5 +227,5 @@ export const DEFAULT_SETTINGS: Settings = {
   apiKey: "",
   baseUrl: "https://api.openai.com/v1",
   model: "gpt-4o-mini",
-  uiLang: "en",
+  uiLang: "he",
 };

@@ -139,7 +139,7 @@ export type Settings = {
 
 export type AppView =
   | { page: "home" }
-  | { page: "resume"; id: string }
+  | { page: "resume"; id: string; intent?: "import" }
   | { page: "cover"; id: string }
   | { page: "resignation"; id: string }
   | { page: "settings" };

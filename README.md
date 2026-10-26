@@ -1,4 +1,4 @@
-# CV Workbench
+# קורות · Korot
 
 A resume studio that runs in the browser. Write your CV in **English or Hebrew**, see it update live as a real A4 page, check it against a job ad with an **ATS score**, and download it as PDF or Word.
 
@@ -6,9 +6,20 @@ It also writes cover letters and resignation letters. No account, no subscriptio
 
 **Why:** most resume builders lock the good templates behind a subscription, handle Hebrew badly, and keep your data on their servers. This one runs entirely in the browser, speaks both languages properly and still gives you an ATS check and AI help with your own key.
 
-![CV Workbench editing an English CV](docs/screenshot.png)
+![Korot editing the work experience of an English CV](docs/screenshot.png)
 
 ## What it does
+
+### Your documents
+- A gallery of every CV and letter with a large page preview, the language of each CV, and when it was last edited.
+- Search, sort by last edit or by name, and separate tabs for CVs and letters.
+- Start a new document, or **import the CV you already have** (paste it as text and AI sorts it into the fields).
+
+### The editor
+- A menu of sections on one side, the form for one section in the middle, and the CV itself on the other side, updating as you type.
+- **Content** and **Design** are separate tabs, so writing and styling never get in each other’s way.
+- AI wording suggestions appear next to the text with *Replace* and *Cancel*; nothing changes until you accept.
+- On a phone, the form and the CV preview are two tabs.
 
 ### Live editor and templates
 - Six templates: **Perth** (two-column timeline), **Classic** (single column, ATS-safe), **Sidebar** (room for a photo), **Editorial**, **Compact** and **Aurora**.
@@ -23,7 +34,7 @@ It also writes cover letters and resignation letters. No account, no subscriptio
 - The app's own interface is also available in English or Hebrew.
 - AI translation turns a CV into any other language.
 
-![The same editor with a Hebrew CV and the Hebrew interface](docs/screenshot-he.png)
+![The documents gallery in the Hebrew interface](docs/screenshot-he.png)
 
 ### ATS check against a job ad
 Paste the job description and the tool tells you how well the CV matches it:
@@ -48,7 +59,7 @@ CVs are saved in your browser, so nothing is uploaded unless you set it up. The 
 
 ## Built with
 
-React 19, TypeScript and Vite. `docx` for Word files, `jsPDF` and `html2canvas` for PDF.
+React 19, TypeScript and Vite. `docx` for Word files, `jsPDF` and `html2canvas` for PDF. Interface fonts are Heebo and Frank Ruhl Libre (SIL Open Font License), served with the app.
 
 ## Run it yourself
 

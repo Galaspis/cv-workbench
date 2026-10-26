@@ -2,57 +2,65 @@ import { StoreProvider, useStore } from "./store";
 import { CoverEditor, Dashboard, ResignationEditor, SettingsPage } from "./pages/Home";
 import { ResumeEditor } from "./pages/ResumeEditor";
 import { UI } from "./i18n";
+import { useEffect } from "react";
 import "./index.css";
 
-function Shell() {
-  const { view, setView, settings, setSettings, sync, syncError } = useStore();
+function Header() {
+  const { view, setView, settings, setSettings } = useStore();
   const t = UI[settings.uiLang];
-  const he = settings.uiLang === "he";
-  const syncLabel = {
-    connecting: he ? "מתחבר…" : "Connecting…",
-    synced: he ? "נשמר בענן" : "Saved to cloud",
-    saving: he ? "שומר…" : "Saving…",
-    offline: he ? "שמור במכשיר הזה בלבד" : "Saved on this device only",
-    error: syncError || (he ? "שגיאת סנכרון" : "Sync error"),
-  }[sync];
+  const onDocs = view.page !== "settings";
   return (
-    <div className="app-shell" dir={settings.uiLang === "he" ? "rtl" : "ltr"} lang={settings.uiLang}>
-      <nav className="nav">
-        <div className="brand">
-          <div className="mark" aria-hidden>
-            CV
-          </div>
-          <div>
-            <h1>{t.brand}</h1>
-            <small>{t.studio}</small>
-          </div>
-        </div>
-        <div className="lang-switch">
+    <header className="topbar">
+      <button type="button" className="logo" onClick={() => setView({ page: "home" })} aria-label={t.myDocs}>
+        <img src="/brand/korot-horizontal.svg" alt={t.brand} width={150} height={52} />
+      </button>
+      <nav className="topnav">
+        <button type="button" className={onDocs ? "active" : ""} onClick={() => setView({ page: "home" })}>
+          {t.myDocs}
+        </button>
+        <button
+          type="button"
+          className={view.page === "settings" ? "active" : ""}
+          onClick={() => setView({ page: "settings" })}
+        >
+          {t.settings}
+        </button>
+      </nav>
+      <div className="topbar-end">
+        <div className="ui-lang" role="group" aria-label="Language">
           <button
-            className={settings.uiLang === "en" ? "active" : ""}
-            onClick={() => setSettings({ uiLang: "en" })}
-          >
-            EN
-          </button>
-          <button
+            type="button"
             className={settings.uiLang === "he" ? "active" : ""}
             onClick={() => setSettings({ uiLang: "he" })}
+            lang="he"
           >
             עברית
           </button>
+          <span aria-hidden>/</span>
+          <button
+            type="button"
+            className={settings.uiLang === "en" ? "active" : ""}
+            onClick={() => setSettings({ uiLang: "en" })}
+            lang="en"
+          >
+            EN
+          </button>
         </div>
-        <p className={`sync-state ${sync}`} title={syncLabel}>
-          {syncLabel}
-        </p>
-        <button className={view.page === "home" ? "active" : ""} onClick={() => setView({ page: "home" })}>
-          {t.documents}
-        </button>
-        <button className={view.page === "settings" ? "active" : ""} onClick={() => setView({ page: "settings" })}>
-          {t.settings}
-        </button>
-        <div className="spacer" />
-        <p className="hint">{t.hint}</p>
-      </nav>
+      </div>
+    </header>
+  );
+}
+
+function Shell() {
+  const { settings } = useStore();
+  const dir = settings.uiLang === "he" ? "rtl" : "ltr";
+  useEffect(() => {
+    document.documentElement.lang = settings.uiLang;
+    document.documentElement.dir = dir;
+  }, [settings.uiLang, dir]);
+  return (
+    <div className="app-shell" dir={dir} lang={settings.uiLang}>
+      <Header />
       <main className="workspace">
         <Page />
       </main>
@@ -65,7 +73,7 @@ function Page() {
   if (view.page === "settings") return <SettingsPage />;
   if (view.page === "resume") {
     const resume = docs.resumes.find((r) => r.id === view.id);
-    return resume ? <ResumeEditor resume={resume} /> : <Dashboard />;
+    return resume ? <ResumeEditor key={resume.id} resume={resume} intent={view.intent} /> : <Dashboard />;
   }
   if (view.page === "cover") {
     const letter = docs.covers.find((r) => r.id === view.id);

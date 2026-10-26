@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { DEFAULT_SETTINGS, createCoverLetter, createResignation, createResume } from "./factory";
+import { DEFAULT_SETTINGS, createCoverLetter, createLocalizedResume, createResignation } from "./factory";
 import { RETIRED_SEED_IDS, SEED_IDS, SEED_RESUMES } from "./data/seedResumes";
 import { CloudConflict, CloudUnavailable, cloudStore } from "./lib/cloud";
 import type {
@@ -34,7 +34,7 @@ type Store = {
   upsertResignation: (letter: ResignationLetter) => void;
   remove: (kind: "resume" | "cover" | "resignation", id: string) => void;
   duplicateResume: (id: string) => void;
-  newResume: () => void;
+  newResume: (intent?: "import") => void;
   newCover: (resumeId?: string) => void;
   newResignation: () => void;
   loadSample: () => void;
@@ -274,18 +274,21 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setDocs((d) => ({ ...d, resumes: [copy, ...d.resumes] }));
         setView({ page: "resume", id: copy.id });
       },
-      newResume: () => {
-        const resume = createResume();
+      newResume: (intent) => {
+        const resume = createLocalizedResume(settings.uiLang);
         setDocs((d) => ({ ...d, resumes: [resume, ...d.resumes] }));
-        setView({ page: "resume", id: resume.id });
+        setView({ page: "resume", id: resume.id, intent });
       },
       newCover: (resumeId) => {
-        const letter = createCoverLetter(resumeId ?? docs.resumes[0]?.id ?? "");
+        const letter = {
+          ...createCoverLetter(resumeId ?? docs.resumes[0]?.id ?? ""),
+          ...(settings.uiLang === "he" ? { title: "מכתב מקדים" } : {}),
+        };
         setDocs((d) => ({ ...d, covers: [letter, ...d.covers] }));
         setView({ page: "cover", id: letter.id });
       },
       newResignation: () => {
-        const letter = createResignation();
+        const letter = { ...createResignation(), ...(settings.uiLang === "he" ? { title: "מכתב התפטרות" } : {}) };
         setDocs((d) => ({ ...d, resignations: [letter, ...d.resignations] }));
         setView({ page: "resignation", id: letter.id });
       },
