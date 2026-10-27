@@ -1,4 +1,4 @@
-name: Deploy cv.gallab.top
+name: Deploy korot.gallab.top
 # Push to main → build → the server. Needs repo secrets VPS_SSH_KEY and VPS_HOST.
 on:
   push:
@@ -36,6 +36,9 @@ jobs:
           ssh deploy@$H 'sudo /usr/local/bin/caddy-site-install cv'
       - name: Smoke test
         run: |
-          code=$(curl -s -o /dev/null -m 15 -w "%{http_code}" https://cv.gallab.top/)
-          echo "cv.gallab.top → $code (401 = login gate, expected)"
+          code=$(curl -s -o /dev/null -m 15 -w "%{http_code}" https://korot.gallab.top/)
+          echo "korot.gallab.top → $code (401 = login gate, expected)"
           test "$code" = "401"
+          old=$(curl -s -o /dev/null -m 15 -w "%{http_code} %{redirect_url}" https://cv.gallab.top/)
+          echo "cv.gallab.top → $old (should redirect to korot.gallab.top)"
+          case "$old" in 30[18]\ https://korot.gallab.top/*) ;; *) exit 1 ;; esac

@@ -3,17 +3,18 @@
  "repo": "cv-workbench",
  "database": "none (browser state + the hub document store)",
  "hosting": "OVH VPS (static, Caddy)",
- "domain": "cv.gallab.top",
- "url": "https://cv.gallab.top",
+ "domain": "korot.gallab.top",
+ "url": "https://korot.gallab.top",
  "services": [
   "OpenAI-compatible API (optional, user key)"
  ],
  "banned": [
-  "CV Workbench"
+  "CV Workbench",
+  "cv.gallab.top"
  ],
  "ignore": [
   "readme: README does not mention"
  ],
  "_ignore_why": "The README does not name the live site, by decision (2026-10-21).",
- "_renamed": "2026-10-26: the app is now called קורות (Korot). The repo name cv-workbench stays."
+ "_renamed": "2026-10-26: the app is now called קורות (Korot). 2026-10-27: moved to korot.gallab.top; cv.gallab.top redirects there. The repo name cv-workbench stays."
 }

@@ -7,6 +7,7 @@ import { Field, Menu, Tabs, useT } from "../components/ui";
 import { exportLetterDocx, exportPreviewPdf, exportResumeDocx, exportTxt } from "../lib/export";
 import { generateCoverLetter, generateResignation, pingAi } from "../lib/ai";
 import { useStore } from "../store";
+import { SEED_IDS } from "../data/seedResumes";
 import { ACCENTS, BODY_FONTS, TEMPLATES, TITLE_FONTS } from "../types";
 import type { CoverLetter, ResignationLetter, Resume } from "../types";
 import { useMemo, useRef, useState, type ReactNode } from "react";
@@ -419,15 +420,16 @@ type LetterItem =
   | { kind: "resignation"; doc: ResignationLetter };
 
 export function Dashboard() {
-  const { docs, newResume, newCover, newResignation, setView, remove, duplicateResume } = useStore();
+  const { docs, newResume, newCover, newResignation, setView, remove, duplicateResume, moveResume } = useStore();
   const t = useT();
   const [tab, setTab] = useState<"cvs" | "letters">("cvs");
   const [query, setQuery] = useState("");
-  const [sort, setSort] = useState<"recent" | "name">("recent");
+  const [sort, setSort] = useState<"custom" | "recent" | "name">("custom");
 
   const q = query.trim().toLowerCase();
+  // "My order" keeps the stored order (your CVs as you arranged them, demo CVs last).
   const order = <T extends { title: string; updatedAt: number }>(a: T, b: T) =>
-    sort === "name" ? a.title.localeCompare(b.title) : b.updatedAt - a.updatedAt;
+    sort === "custom" ? 0 : sort === "name" ? a.title.localeCompare(b.title) : b.updatedAt - a.updatedAt;
 
   const resumes = useMemo(
     () =>
@@ -460,11 +462,8 @@ export function Dashboard() {
 
   return (
     <div className="page">
+      <h1 className="sr-only">{t.myDocs}</h1>
       <div className="dash-head">
-        <div>
-          <h1 className="page-title">{t.myDocs}</h1>
-          <p className="page-sub">{t.dashSub}</p>
-        </div>
         <div className="dash-actions">
           <button type="button" className="btn outline" onClick={() => newResume("import")}>
             <Icon name="upload" size={20} />
@@ -497,8 +496,9 @@ export function Dashboard() {
         />
         <div className="dash-filters">
           <label className="select">
-            <span className="sr-only">{t.sortRecent}</span>
-            <select value={sort} onChange={(e) => setSort(e.target.value as "recent" | "name")}>
+            <span className="sr-only">{t.sortCustom}</span>
+            <select value={sort} onChange={(e) => setSort(e.target.value as "custom" | "recent" | "name")}>
+              <option value="custom">{t.sortCustom}</option>
               <option value="recent">{t.sortRecent}</option>
               <option value="name">{t.sortName}</option>
             </select>
@@ -524,6 +524,12 @@ export function Dashboard() {
                 updatedAt={r.updatedAt}
                 onOpen={() => setView({ page: "resume", id: r.id })}
                 items={(pdf) => [
+                  ...(sort === "custom" && !SEED_IDS.has(r.id)
+                    ? [
+                        { label: t.moveEarlier, onClick: () => moveResume(r.id, -1) },
+                        { label: t.moveLater, onClick: () => moveResume(r.id, 1) },
+                      ]
+                    : []),
                   { label: t.duplicate, icon: "duplicate", onClick: () => duplicateResume(r.id) },
                   { label: t.downloadPdf, icon: "download", onClick: pdf },
                   { label: t.downloadWord, icon: "document", onClick: () => void exportResumeDocx(r) },

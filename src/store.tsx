@@ -34,6 +34,8 @@ type Store = {
   upsertResignation: (letter: ResignationLetter) => void;
   remove: (kind: "resume" | "cover" | "resignation", id: string) => void;
   duplicateResume: (id: string) => void;
+  /** Move one of your own CVs earlier (-1) or later (+1) in "My order". Demo CVs stay last. */
+  moveResume: (id: string, delta: -1 | 1) => void;
   newResume: (intent?: "import") => void;
   newCover: (resumeId?: string) => void;
   newResignation: () => void;
@@ -51,7 +53,8 @@ function mergeSeeds(docs: Docs): Docs {
   );
   const existingById = new Map(docs.resumes.map((r) => [r.id, r]));
   const seeded = SEED_RESUMES.map((seed) => existingById.get(seed.id) ?? seed);
-  return { ...docs, resumes: [...seeded, ...extras] };
+  // Your own CVs first, in the order you set; the demo CVs last.
+  return { ...docs, resumes: [...extras, ...seeded] };
 }
 
 function normalize(d: Partial<Docs>): Docs {
@@ -274,6 +277,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setDocs((d) => ({ ...d, resumes: [copy, ...d.resumes] }));
         setView({ page: "resume", id: copy.id });
       },
+      moveResume: (id, delta) =>
+        setDocs((d) => {
+          const own = d.resumes.filter((r) => !SEED_IDS.has(r.id));
+          const demos = d.resumes.filter((r) => SEED_IDS.has(r.id));
+          const i = own.findIndex((r) => r.id === id);
+          const j = i + delta;
+          if (i < 0 || j < 0 || j >= own.length) return d;
+          [own[i], own[j]] = [own[j], own[i]];
+          return { ...d, resumes: [...own, ...demos] };
+        }),
       newResume: (intent) => {
         const resume = createLocalizedResume(settings.uiLang);
         setDocs((d) => ({ ...d, resumes: [resume, ...d.resumes] }));
@@ -299,8 +312,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setDocs((d) => ({
           ...d,
           resumes: [
-            ...SEED_RESUMES,
             ...d.resumes.filter((r) => !SEED_IDS.has(r.id) && !RETIRED_SEED_IDS.has(r.id) && !r.title.includes("Maya Ellison")),
+            ...SEED_RESUMES,
           ],
         }));
       },

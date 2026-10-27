@@ -1,11 +1,13 @@
-# CV Workbench. Install as /etc/caddy/sites/cv.caddy, then: sudo systemctl reload caddy
+# קורות (Korot). Installed by the deploy Action as /etc/caddy/sites/cv.caddy.
+# The file keeps its old name on purpose: installing it replaces the old cv.gallab.top site
+# instead of adding a second file that would define the same address twice.
 # Static build in /srv/cv/site, behind the shared Google login.
 # /anthropic-api/* is relayed to Anthropic, same as the Vite dev server does, so the
 # browser never needs the "dangerous direct access" header. The API key stays in the
 # browser (the app's settings), it is not stored on the server.
 # "import datastore" gives the app the hub's document store: the CVs are saved per person at
 # /api/data/cv, so the PC and the phone see the same copy.
-cv.gallab.top {
+korot.gallab.top {
     encode zstd gzip
     header {
         X-Robots-Tag "noindex, nofollow"
@@ -50,4 +52,9 @@ cv.gallab.top {
             file_server
         }
     }
+}
+
+# The old address. Everything moves to korot.gallab.top, keeping the path (old bookmarks work).
+cv.gallab.top {
+    redir https://korot.gallab.top{uri} permanent
 }

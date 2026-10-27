@@ -83,6 +83,16 @@ img { max-width: 100%; }
   align-items: center;
 }
 .logo img { width: 150px; height: auto; display: block; }
+.logo-en { display: flex; align-items: center; gap: 10px; }
+.logo .logo-en img { width: 46px; }
+.logo-en span {
+  font-family: var(--font-title);
+  font-weight: 500;
+  font-size: 34px;
+  letter-spacing: 0.08em;
+  color: var(--ink);
+  line-height: 1;
+}
 .topnav { display: flex; gap: 36px; }
 .topnav button {
   border: 0;
@@ -229,7 +239,7 @@ img { max-width: 100%; }
 /* ---------- gallery ---------- */
 .dash-head {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-end;
   align-items: flex-start;
   gap: 24px;
   flex-wrap: wrap;
@@ -756,9 +766,14 @@ img { max-width: 100%; }
 }
 @media (max-width: 700px) {
   :root { --topbar-h: 60px; }
-  .topbar { gap: 14px; padding: 0 16px; }
+  .topbar { height: auto; flex-wrap: wrap; gap: 0 14px; padding: 0 16px; }
+  .logo { height: 54px; flex: none; }
+  .topbar-end { order: 2; }
+  .topnav { order: 3; width: 100%; height: 44px; gap: 24px; }
   .logo img { width: 104px; }
-  .topnav { gap: 14px; }
+  .logo-en { gap: 6px; }
+  .logo .logo-en img { width: 30px; }
+  .logo-en span { font-size: 19px; letter-spacing: 0.05em; }
   .topnav button { font-size: 15px; white-space: nowrap; }
   .topbar-end { gap: 8px; }
   .ui-lang { font-size: 14px; }

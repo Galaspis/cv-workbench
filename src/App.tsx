@@ -12,7 +12,14 @@ function Header() {
   return (
     <header className="topbar">
       <button type="button" className="logo" onClick={() => setView({ page: "home" })} aria-label={t.myDocs}>
-        <img src="/brand/korot-horizontal.svg" alt={t.brand} width={150} height={52} />
+        {settings.uiLang === "he" ? (
+          <img src="/brand/korot-horizontal.svg" alt="קורות" width={150} height={52} />
+        ) : (
+          <span className="logo-en">
+            <img src="/brand/korot-symbol.svg" alt="" width={46} height={46} />
+            <span>KOROT</span>
+          </span>
+        )}
       </button>
       <nav className="topnav">
         <button type="button" className={onDocs ? "active" : ""} onClick={() => setView({ page: "home" })}>
@@ -57,6 +64,7 @@ function Shell() {
   useEffect(() => {
     document.documentElement.lang = settings.uiLang;
     document.documentElement.dir = dir;
+    document.title = settings.uiLang === "he" ? "קורות" : "Korot";
   }, [settings.uiLang, dir]);
   return (
     <div className="app-shell" dir={dir} lang={settings.uiLang}>
