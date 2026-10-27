@@ -5,3 +5,6 @@ dist
 .env
 .env.*
 .claude/
+
+# Brand kit source (logos, AI source images, mockups). Kept on this PC only; the app uses the copies in public/brand and src/brand.
+korot-brand-kit/
