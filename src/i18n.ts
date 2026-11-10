@@ -215,8 +215,10 @@ const en = {
   openaiModelPh: "Choose or type a model",
   loadModels: "Load my models",
   loadingModels: "Loading…",
-  modelsLoaded: "{n} models found. Pick one in the model box.",
+  modelsLoaded: "{n} models available.",
   noModels: "No chat models found for this key.",
+  pickFromList: "Pick from my models",
+  typeModel: "Type a model name instead",
 
   // busy messages
   busyRewrite: "Rewriting…",
@@ -470,8 +472,10 @@ const he: Strings = {
   openaiModelPh: "בחרו או הקלידו מודל",
   loadModels: "טעינת המודלים שלי",
   loadingModels: "טוען…",
-  modelsLoaded: "נמצאו {n} מודלים. בחרו אחד בתיבת המודל.",
+  modelsLoaded: "{n} מודלים זמינים.",
   noModels: "לא נמצאו מודלי צ׳אט למפתח הזה.",
+  pickFromList: "בחירה מהמודלים שלי",
+  typeModel: "הקלדת שם מודל במקום",
 
   busyRewrite: "משפר ניסוח…",
   busySuggest: "מציע הישגים…",

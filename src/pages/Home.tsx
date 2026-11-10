@@ -11,7 +11,7 @@ import { useStore } from "../store";
 import { SEED_IDS } from "../data/seedResumes";
 import { ACCENTS, BODY_FONTS, TEMPLATES, TITLE_FONTS } from "../types";
 import type { CoverLetter, ResignationLetter, Resume } from "../types";
-import { useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 function localeBadge(locale: string) {
   if (locale === "he") return "עברית";
@@ -306,6 +306,13 @@ export function SettingsPage() {
   const [showOpenAiKey, setShowOpenAiKey] = useState(false);
   const [models, setModels] = useState<string[]>([]);
   const [modelsMsg, setModelsMsg] = useState("");
+  const [typingModel, setTypingModel] = useState(false);
+
+  // With an OpenAI key saved, fill the model list as soon as Settings opens.
+  useEffect(() => {
+    if (settings.openaiKey.trim() && !models.length) void loadModels();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function loadModels() {
     setModelsMsg(t.loadingModels);
@@ -418,19 +425,38 @@ export function SettingsPage() {
           </label>
           <label className="field">
             <span className="field-label">{t.model}</span>
-            <input
-              list="openai-models"
-              dir="ltr"
-              value={settings.openaiModel}
-              placeholder={t.openaiModelPh}
-              onChange={(e) => setSettings({ openaiModel: e.target.value })}
-            />
-            <datalist id="openai-models">
-              {models.map((m) => (
-                <option key={m} value={m} />
-              ))}
-            </datalist>
+            {/* A real dropdown once the models are loaded; a suggestion list would only show names that match what's typed. */}
+            {models.length && !typingModel ? (
+              <select
+                dir="ltr"
+                value={models.includes(settings.openaiModel) ? settings.openaiModel : ""}
+                onChange={(e) => setSettings({ openaiModel: e.target.value })}
+              >
+                {models.includes(settings.openaiModel) ? null : (
+                  <option value="" disabled>
+                    {settings.openaiModel || t.openaiModelPh}
+                  </option>
+                )}
+                {models.map((m) => (
+                  <option key={m} value={m}>
+                    {m}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <input
+                dir="ltr"
+                value={settings.openaiModel}
+                placeholder={t.openaiModelPh}
+                onChange={(e) => setSettings({ openaiModel: e.target.value })}
+              />
+            )}
           </label>
+          {models.length ? (
+            <button type="button" className="link-btn model-toggle" onClick={() => setTypingModel((v) => !v)}>
+              {typingModel ? t.pickFromList : t.typeModel}
+            </button>
+          ) : null}
           <div className="row">
             <button type="button" className="btn outline" onClick={loadModels} disabled={!settings.openaiKey.trim()}>
               {t.loadModels}
