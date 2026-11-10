@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useRef, useState, type R
 import { DEFAULT_SETTINGS, createCoverLetter, createLocalizedResume, createResignation } from "./factory";
 import { RETIRED_SEED_IDS, SEED_IDS, SEED_RESUMES } from "./data/seedResumes";
 import { CloudConflict, CloudUnavailable, cloudStore } from "./lib/cloud";
+import { migratedFeatureModels } from "./lib/models";
 import type {
   AppView,
   CoverLetter,
@@ -105,7 +106,7 @@ function loadSettings(): Settings {
     const raw = localStorage.getItem(SETTINGS_KEY);
     if (!raw) return { ...DEFAULT_SETTINGS };
     const saved = JSON.parse(raw) as Partial<Settings>;
-    const s: Settings = { ...DEFAULT_SETTINGS, ...saved };
+    const s: Settings = { ...DEFAULT_SETTINGS, ...saved, featureModels: migratedFeatureModels(saved) };
     // Before there were two key boxes, an OpenAI key lived in apiKey. Move it to its own box.
     if (!saved.provider && s.apiKey && !s.apiKey.startsWith("sk-ant-")) {
       return {

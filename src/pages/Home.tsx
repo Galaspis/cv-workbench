@@ -7,6 +7,8 @@ import { Icon } from "../components/Icon";
 import { Field, Menu, Tabs, useT } from "../components/ui";
 import { exportLetterDocx, exportPreviewPdf, exportResumeDocx, exportTxt } from "../lib/export";
 import { generateCoverLetter, generateResignation, listOpenAiModels, pingAi } from "../lib/ai";
+import { FEATURES, modelFor, rememberOpenAiModels } from "../lib/models";
+import { featureDesc, featureName, ModelChip, ModelSelect } from "../components/ai";
 import { useStore } from "../store";
 import { SEED_IDS } from "../data/seedResumes";
 import { ACCENTS, BODY_FONTS, TEMPLATES, TITLE_FONTS } from "../types";
@@ -172,10 +174,13 @@ export function CoverEditor({ letter }: { letter: CoverLetter }) {
           <section className="panel">
             <div className="panel-head">
               <h2 className="section-title">{t.newCover}</h2>
+              <div className="ai-action">
+              <ModelChip feature="letters" />
               <button type="button" className="btn soft" onClick={generate} disabled={!!busy}>
                 <Icon name="ai-rewrite" size={18} />
                 {t.generate}
               </button>
+              </div>
             </div>
             <Field label={t.docTitle} value={letter.title} onChange={(title) => patch({ title })} />
             <label className="field">
@@ -262,10 +267,13 @@ export function ResignationEditor({ letter }: { letter: ResignationLetter }) {
         <section className="panel">
           <div className="panel-head">
             <h2 className="section-title">{t.newResign}</h2>
+            <div className="ai-action">
+            <ModelChip feature="letters" />
             <button type="button" className="btn soft" onClick={generate} disabled={!!busy}>
               <Icon name="ai-rewrite" size={18} />
               {t.generate}
             </button>
+            </div>
           </div>
           <Field label={t.docTitle} value={letter.title} onChange={(title) => patch({ title })} />
           <div className="two">
@@ -306,7 +314,6 @@ export function SettingsPage() {
   const [showOpenAiKey, setShowOpenAiKey] = useState(false);
   const [models, setModels] = useState<string[]>([]);
   const [modelsMsg, setModelsMsg] = useState("");
-  const [typingModel, setTypingModel] = useState(false);
 
   // With an OpenAI key saved, fill the model list as soon as Settings opens.
   useEffect(() => {
@@ -320,18 +327,22 @@ export function SettingsPage() {
       const list = await listOpenAiModels(settings.openaiKey);
       setModels(list);
       setModelsMsg(list.length ? t.modelsLoaded.replace("{n}", String(list.length)) : t.noModels);
-      if (!settings.openaiModel && list[0]) setSettings({ openaiModel: list[0] });
+      rememberOpenAiModels(settings.openaiKey.trim(), list);
     } catch (e) {
       setModelsMsg(e instanceof Error ? e.message : t.failed);
     }
   }
 
-  async function testConnection() {
+  async function testConnection(provider: "anthropic" | "openai") {
     setTestBusy(true);
     setTestMsg("");
     setTestOk(false);
     try {
-      const reply = await pingAi(settings);
+      // Test with a model this key can use: the first feature set to this provider, else a cheap default.
+      const used = FEATURES.map((f) => modelFor(settings, f)).find((m) => m.provider === provider);
+      const ref = used ?? (provider === "anthropic" ? { provider, id: "claude-haiku-5-5" } : { provider, id: models[0] ?? "" });
+      if (!ref.id) throw new Error(t.noModels);
+      const reply = await pingAi(settings, ref);
       setTestOk(true);
       setTestMsg(`${t.connected} ${reply}`);
     } catch (e) {
@@ -346,35 +357,10 @@ export function SettingsPage() {
     <div className="page narrow">
       <h1 className="page-title">{t.settings}</h1>
       <section className="panel">
-        <h2 className="section-title">{t.aiTitle}</h2>
-        <p className="lede">{t.aiHelp}</p>
+        <h2 className="section-title">{t.keysTitle}</h2>
+        <p className="lede">{t.keysHelp}</p>
 
-        <p className="field-label">{t.aiProvider}</p>
-        <div className="seg">
-          <button
-            type="button"
-            className={settings.provider === "anthropic" ? "active" : ""}
-            onClick={() => {
-              setSettings({ provider: "anthropic" });
-              setTestMsg("");
-            }}
-          >
-            Claude
-          </button>
-          <button
-            type="button"
-            className={settings.provider === "openai" ? "active" : ""}
-            onClick={() => {
-              setSettings({ provider: "openai" });
-              setTestMsg("");
-            }}
-          >
-            OpenAI
-          </button>
-        </div>
-        <p className="lede">{settings.provider === "openai" ? t.tailorNoteOpenAi : t.tailorKeyNote}</p>
-
-        <div className={`provider-box ${settings.provider === "anthropic" ? "active" : ""}`}>
+        <div className="provider-box active">
           <h3 className="panel-title">Claude</h3>
           <label className="field">
             <span className="field-label">{t.claudeKey}</span>
@@ -393,18 +379,14 @@ export function SettingsPage() {
               </button>
             </span>
           </label>
-          <Field label={t.model} dir="ltr" value={settings.model} onChange={(model) => setSettings({ model })} />
-          <div className="chip-row">
-            <button className="chip" type="button" onClick={() => setSettings({ model: "claude-haiku-4-5-20251001" })}>
-              Claude Haiku 4.5
-            </button>
-            <button className="chip" type="button" onClick={() => setSettings({ model: "claude-sonnet-5-5" })}>
-              Claude Sonnet 5.5
+          <div className="row">
+            <button type="button" className="btn outline" onClick={() => void testConnection("anthropic")} disabled={testBusy || !settings.apiKey.trim()}>
+              {testBusy ? t.testing : t.testClaude}
             </button>
           </div>
         </div>
 
-        <div className={`provider-box ${settings.provider === "openai" ? "active" : ""}`}>
+        <div className="provider-box active">
           <h3 className="panel-title">OpenAI</h3>
           <label className="field">
             <span className="field-label">{t.openaiKey}</span>
@@ -423,54 +405,33 @@ export function SettingsPage() {
               </button>
             </span>
           </label>
-          <label className="field">
-            <span className="field-label">{t.model}</span>
-            {/* A real dropdown once the models are loaded; a suggestion list would only show names that match what's typed. */}
-            {models.length && !typingModel ? (
-              <select
-                dir="ltr"
-                value={models.includes(settings.openaiModel) ? settings.openaiModel : ""}
-                onChange={(e) => setSettings({ openaiModel: e.target.value })}
-              >
-                {models.includes(settings.openaiModel) ? null : (
-                  <option value="" disabled>
-                    {settings.openaiModel || t.openaiModelPh}
-                  </option>
-                )}
-                {models.map((m) => (
-                  <option key={m} value={m}>
-                    {m}
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <input
-                dir="ltr"
-                value={settings.openaiModel}
-                placeholder={t.openaiModelPh}
-                onChange={(e) => setSettings({ openaiModel: e.target.value })}
-              />
-            )}
-          </label>
-          {models.length ? (
-            <button type="button" className="link-btn model-toggle" onClick={() => setTypingModel((v) => !v)}>
-              {typingModel ? t.pickFromList : t.typeModel}
-            </button>
-          ) : null}
           <div className="row">
             <button type="button" className="btn outline" onClick={loadModels} disabled={!settings.openaiKey.trim()}>
               {t.loadModels}
             </button>
+            <button type="button" className="btn outline" onClick={() => void testConnection("openai")} disabled={testBusy || !settings.openaiKey.trim()}>
+              {testBusy ? t.testing : t.testOpenAi}
+            </button>
             {modelsMsg ? <span className="hint-text inline">{modelsMsg}</span> : null}
           </div>
         </div>
-
-        <div className="row">
-          <button className="btn primary" onClick={testConnection} disabled={testBusy}>
-            {testBusy ? t.testing : `${t.test} (${settings.provider === "openai" ? "OpenAI" : "Claude"})`}
-          </button>
-        </div>
         {testMsg ? <p className={`status ${testOk ? "ok" : "err"}`}>{testMsg}</p> : null}
+      </section>
+
+      <section className="panel">
+        <h2 className="section-title">{t.featureModelsTitle}</h2>
+        <p className="lede">{t.featureModelsHelp}</p>
+        <div className="feature-models">
+          {FEATURES.map((f) => (
+            <div className="feature-row" key={f}>
+              <div>
+                <strong>{featureName(t, f)}</strong>
+                <span>{featureDesc(t, f)}</span>
+              </div>
+              <ModelSelect feature={f} />
+            </div>
+          ))}
+        </div>
       </section>
 
       <section className="panel">

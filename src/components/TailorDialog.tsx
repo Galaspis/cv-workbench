@@ -3,6 +3,7 @@ import { tailorExistingCv, tailorNewCv } from "../lib/tailor";
 import { useStore } from "../store";
 import type { Resume } from "../types";
 import { Icon } from "./Icon";
+import { ModelChip } from "./ai";
 import { useT } from "./ui";
 
 /**
@@ -42,6 +43,7 @@ export function TailorDialog({ source, initialJob = "", onClose }: { source?: Re
         <h2 className="section-title" id="tailor-title">{source ? t.tailorTitle : t.newForJobTitle}</h2>
         <p className="section-intro">{source ? t.tailorSub : t.newForJobSub}</p>
         {source ? <p className="tailor-source">{source.title}</p> : null}
+        <div className="modal-model"><ModelChip feature="tailor" /></div>
 
         <label className="field">
           <span className="field-label">{t.jobAd}</span>

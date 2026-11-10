@@ -42,13 +42,13 @@ Paste the job description and the tool tells you how well the CV matches it:
 - **AI ATS score (0–100)** with a verdict: *Recommended to apply*, *Can apply* or *Improve first*. You also get the matched and missing keywords and concrete suggestions.
 - **Add missing skills** puts the missing keywords into your skills section in one click.
 
-### AI helpers
-- Rewrite the summary, tailored to the job you are applying for.
-- Rewrite a single bullet, or suggest new bullets for a role.
-- **Improve an existing CV**: paste your current CV as text and it is sorted into the editor's fields.
-- Generate cover letters and resignation letters.
+### AI helper and AI tools
+- **AI helper**: a chat about your CV. Ask in your own words ("make my summary fit a product role"); suggested changes appear as cards next to your current text, and nothing changes until you press Apply.
+- **Tailor to a job**: a new copy of your CV rewritten for one job ad, or a new CV built from your old CV, LinkedIn profile or notes. Facts such as employers, titles and dates are kept from your original by the code.
+- **Rewrites you can work with**: every AI rewrite can be edited, run again, or steered ("shorter", "more senior", or your own words) before you apply it.
+- Translate a CV, import an existing one, and write cover and resignation letters.
 
-AI is optional. In **Settings** paste an API key: Anthropic (Claude) or any OpenAI-compatible provider. Your key is stored only in your browser. Requests to Anthropic go through a small same-origin relay (`/anthropic-api`) because the browser cannot call the API directly; the relay does not store the key.
+AI is optional. In **Settings** add an API key for Claude, OpenAI or both, then choose a model for each feature (for example a fast model for the ATS check and a strong one for tailoring). Every AI button shows the model it uses, with a quick switch. Keys stay in your browser; requests go through small same-site relays (`/anthropic-api`, `/openai-api`) that pass the key on and do not store it.
 
 ### Export
 PDF (exactly what you see in the preview), Word (.docx) and plain text (.txt).

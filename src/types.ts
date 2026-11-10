@@ -143,6 +143,8 @@ export type Settings = {
   provider: "anthropic" | "openai";
   openaiKey: string;
   openaiModel: string;
+  /** Model per AI feature, as "anthropic:<id>" or "openai:<id>". Missing entries use the defaults in lib/models.ts. */
+  featureModels: Partial<Record<"rewrite" | "ats" | "tailor" | "translate" | "letters" | "import" | "helper", string>>;
 };
 
 export type AppView =

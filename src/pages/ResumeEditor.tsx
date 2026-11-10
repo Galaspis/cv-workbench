@@ -2,7 +2,9 @@ import { ResumePreview } from "../components/Preview";
 import { PreviewFrame } from "../components/PreviewFrame";
 import { EditorBar } from "../components/EditorBar";
 import { Icon, type IconName } from "../components/Icon";
-import { Field, Suggestion, Tabs, useT } from "../components/ui";
+import { Field, Tabs, useT } from "../components/ui";
+import { AiHelper, AiResult, ModelChip } from "../components/ai";
+import { modelFor, modelLabel } from "../lib/models";
 import { TailorDialog, TailoredNote } from "../components/TailorDialog";
 import {
   improveSummary,
@@ -13,6 +15,7 @@ import {
   suggestSkills,
   translateResume,
   type AtsScoreResult,
+  type RewriteOpts,
 } from "../lib/ai";
 import { analyzeAts } from "../lib/ats";
 import { exportPreviewPdf, exportResumeDocx, exportTxt } from "../lib/export";
@@ -33,7 +36,8 @@ type ContentSection =
   | "projects"
   | "certifications"
   | "ats"
-  | "translate";
+  | "translate"
+  | "helper";
 type DesignSection = "template" | "style" | "order";
 
 type Ctx = {
@@ -262,33 +266,35 @@ function PersonalSection({ ctx, onDesign }: { ctx: Ctx; onDesign: () => void }) 
 function SummarySection({ ctx, job }: { ctx: Ctx; job: string }) {
   const { resume, patch, t, busy, run, settings } = ctx;
   const [proposal, setProposal] = useState("");
+  const rewrite = async (opts?: RewriteOpts) => {
+    const next = await run(t.busyRewrite, () => improveSummary(settings, resume, job, opts));
+    if (next) setProposal(next);
+  };
   return (
     <section className="panel">
       <SectionHead
         title={t.secSummary}
         intro={t.introSummary}
         action={
-          <button
-            type="button"
-            className="btn soft"
-            disabled={!!busy}
-            onClick={async () => {
-              const next = await run(t.busyRewrite, () => improveSummary(settings, resume, job));
-              if (next) setProposal(next);
-            }}
-          >
-            <Icon name="ai-rewrite" size={18} />
-            {t.improve}
-          </button>
+          <div className="ai-action">
+            <ModelChip feature="rewrite" />
+            <button type="button" className="btn soft" disabled={!!busy} onClick={() => void rewrite()}>
+              <Icon name="ai-rewrite" size={18} />
+              {t.improve}
+            </button>
+          </div>
         }
       />
       <Field label={t.summary} area rows={6} max={600} value={resume.summary} onChange={(summary) => patch({ summary })} />
       {proposal ? (
-        <Suggestion
+        <AiResult
           text={proposal}
+          model={modelLabel(modelFor(settings, "rewrite"))}
+          busy={!!busy}
           onCancel={() => setProposal("")}
-          onAccept={() => {
-            patch({ summary: proposal });
+          onRetry={(instruction, previous) => void rewrite({ instruction, previous })}
+          onApply={(text) => {
+            patch({ summary: text });
             setProposal("");
           }}
         />
@@ -314,14 +320,17 @@ function ExperienceSection({ ctx }: { ctx: Ctx }) {
         title={t.secExperience}
         intro={t.introExperience}
         action={
-          <AddButton
-            label={t.addRole}
-            onClick={() => {
-              const id = uid();
-              setJobs([{ id, company: "", role: "", location: "", start: "", end: "", current: false, bullets: [""] }, ...jobs]);
-              setOpenId(id);
-            }}
-          />
+          <div className="ai-action">
+            <ModelChip feature="rewrite" />
+            <AddButton
+              label={t.addRole}
+              onClick={() => {
+                const id = uid();
+                setJobs([{ id, company: "", role: "", location: "", start: "", end: "", current: false, bullets: [""] }, ...jobs]);
+                setOpenId(id);
+              }}
+            />
+          </div>
         }
       />
       {jobs.map((job, idx) => {
@@ -389,6 +398,7 @@ function ExperienceSection({ ctx }: { ctx: Ctx }) {
                               const next = await run(t.busyRewrite, () => rewriteBullet(settings, b, job.role));
                               if (next) setProposals((p) => ({ ...p, [key]: next }));
                             }}
+                            title={modelLabel(modelFor(settings, "rewrite"))}
                           >
                             <Icon name="ai-rewrite" size={18} />
                             {t.improve}
@@ -400,11 +410,17 @@ function ExperienceSection({ ctx }: { ctx: Ctx }) {
                         />
                       </div>
                       {proposals[key] ? (
-                        <Suggestion
+                        <AiResult
                           text={proposals[key]}
+                          model={modelLabel(modelFor(settings, "rewrite"))}
+                          busy={!!busy}
                           onCancel={() => setProposals(({ [key]: _, ...rest }) => rest)}
-                          onAccept={() => {
-                            setBullet(proposals[key]);
+                          onRetry={async (instruction, previous) => {
+                            const next = await run(t.busyRewrite, () => rewriteBullet(settings, b, job.role, { instruction, previous }));
+                            if (next) setProposals((p) => ({ ...p, [key]: next }));
+                          }}
+                          onApply={(text) => {
+                            setBullet(text);
                             setProposals(({ [key]: _, ...rest }) => rest);
                           }}
                         />
@@ -528,7 +544,7 @@ function AtsSection({
   const tone = (score: number) => (score >= 70 ? "good" : score >= 50 ? "mid" : "low");
   return (
     <section className="panel">
-      <SectionHead title={t.secAts} intro={t.introAts} />
+      <SectionHead title={t.secAts} intro={t.introAts} action={<ModelChip feature="ats" />} />
       <Field
         label={t.jobAd}
         area
@@ -664,7 +680,7 @@ function TranslateSection({ ctx }: { ctx: Ctx }) {
   const [lang, setLang] = useState(resume.locale === "he" ? "English" : "Hebrew");
   return (
     <section className="panel">
-      <SectionHead title={t.secTranslate} intro={t.introTranslate} />
+      <SectionHead title={t.secTranslate} intro={t.introTranslate} action={<ModelChip feature="translate" />} />
       <Field label={t.targetLang} value={lang} onChange={setLang} />
       <button
         type="button"
@@ -874,6 +890,7 @@ export function ResumeEditor({ resume, intent }: { resume: Resume; intent?: "imp
     { id: "certifications", label: t.secCertifications, icon: "check", hideKey: "certifications" },
   ];
   const toolNav: { id: ContentSection; label: string; icon: IconName }[] = [
+    { id: "helper", label: t.secHelper, icon: "ai-rewrite" },
     { id: "ats", label: t.secAts, icon: "search" },
     { id: "translate", label: t.secTranslate, icon: "ai-rewrite" },
   ];
@@ -1038,6 +1055,9 @@ export function ResumeEditor({ resume, intent }: { resume: Resume; intent?: "imp
       case "translate":
         body = <TranslateSection ctx={ctx} />;
         break;
+      case "helper":
+        body = <AiHelper resume={resume} patch={patch} job={job} />;
+        break;
     }
   }
 
@@ -1061,6 +1081,7 @@ export function ResumeEditor({ resume, intent }: { resume: Resume; intent?: "imp
           { label: t.txt, icon: "summary", onClick: () => exportTxt(resume) },
         ]}
         more={[
+          { label: t.secHelper, icon: "ai-rewrite", onClick: () => { setMode("content"); setSection("helper"); } },
           { label: t.tailor, icon: "ai-rewrite", onClick: () => setTailorOpen(true) },
           { label: t.largePreview, icon: "search", onClick: () => setLargeOpen(true) },
           { label: t.writeCover, icon: "edit", onClick: () => newCover(resume.id) },
@@ -1119,6 +1140,7 @@ export function ResumeEditor({ resume, intent }: { resume: Resume; intent?: "imp
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <h2 className="section-title">{t.importTitle}</h2>
             <p className="section-intro">{t.importSub}</p>
+            <div className="modal-model"><ModelChip feature="import" /></div>
             <textarea className="input" value={importText} onChange={(e) => setImportText(e.target.value)} rows={10} autoFocus />
             {busy || err ? <p className={`status ${err ? "err" : "busy"}`}>{busy || err}</p> : null}
             <div className="modal-actions">

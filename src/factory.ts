@@ -231,4 +231,5 @@ export const DEFAULT_SETTINGS: Settings = {
   provider: "anthropic",
   openaiKey: "",
   openaiModel: "",
+  featureModels: {},
 };

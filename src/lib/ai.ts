@@ -1,4 +1,5 @@
 import type { Resume, Settings } from "../types";
+import { modelFor, modelLabel, type Feature, type ModelRef } from "./models";
 
 export class AiError extends Error {}
 
@@ -18,17 +19,15 @@ function keyHint(apiKey: string) {
   return `${prefix} (${apiKey.length} chars)`;
 }
 
-function readySettings(settings: Settings) {
-  if (settings.provider === "openai") {
+function readySettings(settings: Settings, ref: ModelRef) {
+  if (ref.provider === "openai") {
     const apiKey = cleanApiKey(settings.openaiKey);
-    if (!apiKey) throw new AiError("Add an OpenAI API key in Settings, or switch the AI provider to Claude.");
-    const model = settings.openaiModel.trim();
-    if (!model) throw new AiError("Choose an OpenAI model in Settings (Load my models lists the ones your key can use).");
-    return { apiKey, model, base: OPENAI_BASE(), anthropic: false };
+    if (!apiKey) throw new AiError(`${modelLabel(ref)} needs an OpenAI API key. Add one in Settings, or choose a Claude model.`);
+    return { apiKey, model: ref.id, base: OPENAI_BASE(), anthropic: false };
   }
   const apiKey = cleanApiKey(settings.apiKey);
-  if (!apiKey) throw new AiError("Add a Claude API key in Settings, or switch the AI provider to OpenAI.");
-  return { apiKey, model: claudeModel(settings.model), base: "https://api.anthropic.com", anthropic: true };
+  if (!apiKey) throw new AiError(`${modelLabel(ref)} needs a Claude API key. Add one in Settings, or choose an OpenAI model.`);
+  return { apiKey, model: ref.id, base: "https://api.anthropic.com", anthropic: true };
 }
 
 /** OpenAI requests go through this site's own relay (see deploy/cv.caddy), never straight from the browser. */
@@ -89,16 +88,12 @@ function parseJsonContent<T>(content: string): T {
   }
 }
 
-function claudeModel(model: string) {
-  if (/claude/i.test(model)) return model;
-  return "claude-haiku-4-5-20251001";
-}
-
 async function postAnthropic(
   settings: Settings,
   body: Record<string, unknown>,
+  ref: ModelRef,
 ): Promise<{ choices?: { message?: { content?: string } }[] }> {
-  const { apiKey } = readySettings(settings);
+  const { apiKey } = readySettings(settings, ref);
   const messages = (body.messages as ChatMessage[]) ?? [];
   const system = messages
     .filter((m) => m.role === "system")
@@ -113,7 +108,7 @@ async function postAnthropic(
   if (!converted.length || converted[0].role !== "user") {
     converted.unshift({ role: "user", content: "Continue." });
   }
-  const model = claudeModel(settings.model);
+  const model = ref.id;
   // Older Claude models (Haiku 4.5 and earlier generations) accept temperature and answer without
   // thinking. Newer ones (Sonnet 5.5, Opus 5.5, ...) reject temperature and think first, and that
   // thinking counts toward max_tokens, so they get room for it.
@@ -158,9 +153,10 @@ async function postAnthropic(
 async function postChat(
   settings: Settings,
   body: Record<string, unknown>,
+  ref: ModelRef,
 ): Promise<{ choices?: { message?: { content?: string } }[] }> {
-  const { apiKey, model, base, anthropic } = readySettings(settings);
-  if (anthropic) return postAnthropic(settings, body);
+  const { apiKey, model, base, anthropic } = readySettings(settings, ref);
+  if (anthropic) return postAnthropic(settings, body, ref);
   // Reasoning models reject temperature and take max_completion_tokens (which also covers their
   // hidden reasoning, so they need far more room than the visible answer).
   const { temperature, max_tokens, ...rest } = body;
@@ -182,30 +178,32 @@ async function postChat(
   return (await res.json()) as { choices?: { message?: { content?: string } }[] };
 }
 
-export async function chatJson<T>(settings: Settings, messages: ChatMessage[]): Promise<T> {
+export async function chatJson<T>(settings: Settings, messages: ChatMessage[], feature: Feature): Promise<T> {
+  const ref = modelFor(settings, feature);
   const payload = { temperature: 0.4, messages };
   try {
-    const data = await postChat(settings, { ...payload, response_format: { type: "json_object" } });
+    const data = await postChat(settings, { ...payload, response_format: { type: "json_object" } }, ref);
     return parseJsonContent<T>(data.choices?.[0]?.message?.content ?? "");
   } catch (e) {
     const msg = e instanceof Error ? e.message : "";
     if (!/response_format|json_object|json mode/i.test(msg)) throw e;
-    const data = await postChat(settings, payload);
+    const data = await postChat(settings, payload, ref);
     return parseJsonContent<T>(data.choices?.[0]?.message?.content ?? "");
   }
 }
 
-export async function chatText(settings: Settings, messages: ChatMessage[]): Promise<string> {
-  const data = await postChat(settings, { temperature: 0.5, messages });
+export async function chatText(settings: Settings, messages: ChatMessage[], feature: Feature): Promise<string> {
+  const data = await postChat(settings, { temperature: 0.5, messages }, modelFor(settings, feature));
   return (data.choices?.[0]?.message?.content ?? "").trim();
 }
 
-export async function pingAi(settings: Settings) {
+/** Sends a tiny request to one model, to check its key and name. */
+export async function pingAi(settings: Settings, ref: ModelRef) {
   const data = await postChat(settings, {
     temperature: 0,
     max_tokens: 8,
     messages: [{ role: "user", content: "Reply with the single word pong" }],
-  });
+  }, ref);
   const text = (data.choices?.[0]?.message?.content ?? "").trim();
   if (!text) throw new AiError("Connected, but the model returned an empty reply. Check the model name.");
   return text;
@@ -239,12 +237,21 @@ export function resumePlainText(resume: Resume) {
   return lines.filter((l) => l !== undefined).join("\n");
 }
 
-export async function improveSummary(settings: Settings, resume: Resume, jobDescription = "") {
+/** Optional steering for a rewrite: the user's instruction, and the attempt they want improved. */
+export type RewriteOpts = { instruction?: string; previous?: string };
+
+const steer = (opts?: RewriteOpts) =>
+  opts?.instruction || opts?.previous
+    ? ` The user saw this attempt: "${opts.previous ?? ""}" and asks: "${opts.instruction || "try a different version"}". Follow that request.`
+    : "";
+
+export async function improveSummary(settings: Settings, resume: Resume, jobDescription = "", opts?: RewriteOpts) {
   const data = await chatJson<{ summary: string }>(settings, [
     {
       role: "system",
       content:
-        "You rewrite resume summaries. Keep facts. Be specific, 3-4 sentences max, first person implied without using I. Return JSON {summary}.",
+        "You rewrite resume summaries. Keep facts; never invent experience, titles or numbers. Be specific, 3-4 sentences max, first person implied without using I. Write in the same language as the current summary. Return JSON {summary}." +
+        steer(opts),
     },
     {
       role: "user",
@@ -255,19 +262,20 @@ export async function improveSummary(settings: Settings, resume: Resume, jobDesc
         jobDescription,
       }),
     },
-  ]);
+  ], "rewrite");
   return data.summary;
 }
 
-export async function rewriteBullet(settings: Settings, bullet: string, role: string) {
+export async function rewriteBullet(settings: Settings, bullet: string, role: string, opts?: RewriteOpts) {
   const data = await chatJson<{ bullet: string }>(settings, [
     {
       role: "system",
       content:
-        "Rewrite one resume bullet. Start with a strong verb, include a metric if present, no first person. Return JSON {bullet}.",
+        "Rewrite one resume bullet. Start with a strong verb, keep any metric that is present, never invent numbers or facts, no first person. Write in the same language as the bullet. Return JSON {bullet}." +
+        steer(opts),
     },
     { role: "user", content: JSON.stringify({ bullet, role }) },
-  ]);
+  ], "rewrite");
   return data.bullet;
 }
 
@@ -279,7 +287,7 @@ export async function suggestBullets(settings: Settings, role: string, company: 
         "Suggest 4 achievement-style resume bullets for this role. Return JSON {bullets: string[]}.",
     },
     { role: "user", content: JSON.stringify({ role, company }) },
-  ]);
+  ], "rewrite");
   return data.bullets ?? [];
 }
 
@@ -294,7 +302,7 @@ export async function suggestSkills(settings: Settings, resume: Resume, jobDescr
       role: "user",
       content: JSON.stringify({ resume: resumePlainText(resume), jobDescription }),
     },
-  ]);
+  ], "ats");
   return data;
 }
 
@@ -317,7 +325,7 @@ export async function scoreAts(settings: Settings, resume: Resume, jobDescriptio
       role: "user",
       content: `JOB DESCRIPTION:\n${jobDescription.slice(0, 8000)}\n\nCV:\n${resumePlainText(resume)}`,
     },
-  ]);
+  ], "ats");
 }
 
 export async function translateResume(settings: Settings, resume: Resume, language: string) {
@@ -353,7 +361,7 @@ export async function translateResume(settings: Settings, resume: Resume, langua
         titles: resume.titles,
       }),
     },
-  ]);
+  ], "translate");
 }
 
 export async function parseResumeText(settings: Settings, text: string) {
@@ -373,7 +381,7 @@ export async function parseResumeText(settings: Settings, text: string) {
         "Extract a structured resume from messy text. Invent ids as uuid-like strings. Return JSON with contact, summary, experience, education, skills, languages, projects, certifications.",
     },
     { role: "user", content: text },
-  ]);
+  ], "import");
 }
 
 export async function generateCoverLetter(
@@ -400,7 +408,7 @@ export async function generateCoverLetter(
         hiringManager,
       }),
     },
-  ]);
+  ], "letters");
 }
 
 export async function generateResignation(
@@ -421,5 +429,5 @@ export async function generateResignation(
         "Write a short, courteous resignation letter. 3 paragraphs. No markdown. Grateful tone, clear last day, offer a clean handoff.",
     },
     { role: "user", content: JSON.stringify(input) },
-  ]);
+  ], "letters");
 }

@@ -148,22 +148,3 @@ export function Tabs<T extends string>({
     </div>
   );
 }
-
-/** "Suggested wording" box with Replace / Cancel, used for every AI rewrite. */
-export function Suggestion({ text, onAccept, onCancel }: { text: string; onAccept: () => void; onCancel: () => void }) {
-  const t = useT();
-  return (
-    <div className="suggestion">
-      <p className="suggestion-label">{t.suggested}</p>
-      <p className="suggestion-text">{text}</p>
-      <div className="suggestion-actions">
-        <button type="button" className="btn ghost" onClick={onCancel}>
-          {t.cancel}
-        </button>
-        <button type="button" className="btn primary" onClick={onAccept}>
-          {t.replace}
-        </button>
-      </div>
-    </div>
-  );
-}
