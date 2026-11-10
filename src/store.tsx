@@ -13,10 +13,12 @@ import type {
 const DOCS_KEY = "cvw.docs.v2";
 const SETTINGS_KEY = "cvw.settings.v1";
 
-type Docs = {
+export type Docs = {
   resumes: Resume[];
   covers: CoverLetter[];
   resignations: ResignationLetter[];
+  /** Deleted document ids and when they were deleted. Synced, so a delete is never undone by a merge. */
+  deleted?: Record<string, number>;
 };
 
 export type SyncState = "connecting" | "synced" | "saving" | "offline" | "error";
@@ -33,6 +35,7 @@ type Store = {
   upsertCover: (letter: CoverLetter) => void;
   upsertResignation: (letter: ResignationLetter) => void;
   remove: (kind: "resume" | "cover" | "resignation", id: string) => void;
+  rename: (kind: "resume" | "cover" | "resignation", id: string, title: string) => void;
   duplicateResume: (id: string) => void;
   /** Move one of your own CVs earlier (-1) or later (+1) in "My order". Demo CVs stay last. */
   moveResume: (id: string, delta: -1 | 1) => void;
@@ -47,36 +50,42 @@ type Store = {
 
 const Ctx = createContext<Store | null>(null);
 
-function mergeSeeds(docs: Docs): Docs {
+export function mergeSeeds(docs: Docs): Docs {
+  const gone = docs.deleted ?? {};
   const extras = docs.resumes.filter(
-    (r) => !SEED_IDS.has(r.id) && !RETIRED_SEED_IDS.has(r.id) && !r.title.includes("Maya Ellison"),
+    (r) => !SEED_IDS.has(r.id) && !RETIRED_SEED_IDS.has(r.id) && !r.title.includes("Maya Ellison") && !gone[r.id],
   );
   const existingById = new Map(docs.resumes.map((r) => [r.id, r]));
-  const seeded = SEED_RESUMES.map((seed) => existingById.get(seed.id) ?? seed);
+  // A demo CV the person deleted stays deleted.
+  const seeded = SEED_RESUMES.filter((seed) => !gone[seed.id]).map((seed) => existingById.get(seed.id) ?? seed);
   // Your own CVs first, in the order you set; the demo CVs last.
   return { ...docs, resumes: [...extras, ...seeded] };
 }
 
 function normalize(d: Partial<Docs>): Docs {
-  return { resumes: d.resumes ?? [], covers: d.covers ?? [], resignations: d.resignations ?? [] };
+  return { resumes: d.resumes ?? [], covers: d.covers ?? [], resignations: d.resignations ?? [], deleted: d.deleted ?? {} };
 }
 
 // Union of two copies by id; the newer edit wins. Used the first time a device syncs and after a
 // save conflict, so nothing either side has is lost. Demo resumes prefer the server copy, because a
 // fresh device stamps them with "now".
-function mergeDocs(server: Docs, local: Docs): Docs {
+export function mergeDocs(server: Docs, local: Docs): Docs {
+  // Deletes from either side win, so a document deleted on one device is not brought back by another.
+  const deleted: Record<string, number> = { ...(server.deleted ?? {}) };
+  for (const [id, at] of Object.entries(local.deleted ?? {})) deleted[id] = Math.max(deleted[id] ?? 0, at);
   const pick = <T extends { id: string; updatedAt: number }>(a: T[], b: T[]) => {
     const byId = new Map(a.map((x) => [x.id, x]));
     for (const x of b) {
       const cur = byId.get(x.id);
       if (!cur || (x.updatedAt > cur.updatedAt && !SEED_IDS.has(x.id))) byId.set(x.id, x);
     }
-    return [...byId.values()];
+    return [...byId.values()].filter((x) => !deleted[x.id]);
   };
   return {
     resumes: pick(server.resumes, local.resumes),
     covers: pick(server.covers, local.covers),
     resignations: pick(server.resignations, local.resignations),
+    deleted,
   };
 }
 
@@ -85,11 +94,7 @@ function loadDocs(): Docs {
     const raw = localStorage.getItem(DOCS_KEY) ?? localStorage.getItem("cvw.docs.v1");
     if (!raw) return mergeSeeds({ resumes: [], covers: [], resignations: [] });
     const parsed = JSON.parse(raw) as Docs;
-    return mergeSeeds({
-      resumes: parsed.resumes ?? [],
-      covers: parsed.covers ?? [],
-      resignations: parsed.resignations ?? [],
-    });
+    return mergeSeeds(normalize(parsed));
   } catch {
     return mergeSeeds({ resumes: [], covers: [], resignations: [] });
   }
@@ -261,9 +266,20 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         })),
       remove: (kind, id) =>
         setDocs((d) => {
-          if (kind === "resume") return { ...d, resumes: d.resumes.filter((r) => r.id !== id) };
-          if (kind === "cover") return { ...d, covers: d.covers.filter((r) => r.id !== id) };
-          return { ...d, resignations: d.resignations.filter((r) => r.id !== id) };
+          const deleted = { ...(d.deleted ?? {}), [id]: Date.now() };
+          if (kind === "resume") return { ...d, deleted, resumes: d.resumes.filter((r) => r.id !== id) };
+          if (kind === "cover") return { ...d, deleted, covers: d.covers.filter((r) => r.id !== id) };
+          return { ...d, deleted, resignations: d.resignations.filter((r) => r.id !== id) };
+        }),
+      rename: (kind, id, title) =>
+        setDocs((d) => {
+          const name = title.trim();
+          if (!name) return d;
+          const apply = <T extends { id: string; title: string; updatedAt: number }>(list: T[]) =>
+            list.map((x) => (x.id === id ? touch({ ...x, title: name }) : x));
+          if (kind === "resume") return { ...d, resumes: apply(d.resumes) };
+          if (kind === "cover") return { ...d, covers: apply(d.covers) };
+          return { ...d, resignations: apply(d.resignations) };
         }),
       duplicateResume: (id) => {
         const src = docs.resumes.find((r) => r.id === id);
@@ -318,12 +334,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         }));
       },
       importBackup: (json) => {
-        const parsed = JSON.parse(json) as Partial<Docs>;
-        setDocs({
-          resumes: parsed.resumes ?? [],
-          covers: parsed.covers ?? [],
-          resignations: parsed.resignations ?? [],
-        });
+        const parsed = normalize(JSON.parse(json) as Partial<Docs>);
+        // Documents in the backup are wanted again, so they are no longer marked as deleted.
+        const restored = new Set([...parsed.resumes, ...parsed.covers, ...parsed.resignations].map((x) => x.id));
+        const deleted = Object.fromEntries(Object.entries(docs.deleted ?? {}).filter(([id]) => !restored.has(id)));
+        setDocs({ ...parsed, deleted });
       },
       exportBackup: () => JSON.stringify(docs, null, 2),
     };

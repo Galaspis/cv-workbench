@@ -1,6 +1,7 @@
 import { CoverPreview, ResignationPreview, ResumePreview } from "../components/Preview";
 import { PreviewFrame } from "../components/PreviewFrame";
 import { GalleryCard } from "../components/DocCard";
+import { TailorDialog } from "../components/TailorDialog";
 import { EditorBar } from "../components/EditorBar";
 import { Icon } from "../components/Icon";
 import { Field, Menu, Tabs, useT } from "../components/ui";
@@ -325,6 +326,7 @@ export function SettingsPage() {
       <section className="panel">
         <h2 className="section-title">{t.aiTitle}</h2>
         <p className="lede">{t.aiHelp}</p>
+        <p className="lede">{t.tailorKeyNote}</p>
         <label className="field">
           <span className="field-label">{t.apiKey}</span>
           <span className="secret-field">
@@ -415,12 +417,54 @@ export function SettingsPage() {
 
 // ---------- gallery ----------
 
+type DocKind = "resume" | "cover" | "resignation";
+
+function RenameDialog({ title, onSave, onClose }: { title: string; onSave: (title: string) => void; onClose: () => void }) {
+  const t = useT();
+  const [value, setValue] = useState(title);
+  const save = () => {
+    if (value.trim()) onSave(value.trim());
+    onClose();
+  };
+  return (
+    <div className="modal-back" onClick={onClose}>
+      <form
+        className="modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="rename-title"
+        onClick={(e) => e.stopPropagation()}
+        onSubmit={(e) => {
+          e.preventDefault();
+          save();
+        }}
+      >
+        <h2 className="section-title" id="rename-title">{t.renameTitle}</h2>
+        <label className="field">
+          <span className="field-label">{t.docName}</span>
+          <input value={value} onChange={(e) => setValue(e.target.value)} autoFocus onFocus={(e) => e.target.select()} />
+        </label>
+        <div className="modal-actions">
+          <button type="button" className="btn ghost" onClick={onClose}>
+            {t.cancel}
+          </button>
+          <button type="submit" className="btn primary" disabled={!value.trim()}>
+            {t.save}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
 type LetterItem =
   | { kind: "cover"; doc: CoverLetter }
   | { kind: "resignation"; doc: ResignationLetter };
 
 export function Dashboard() {
-  const { docs, newResume, newCover, newResignation, setView, remove, duplicateResume, moveResume } = useStore();
+  const { docs, newResume, newCover, newResignation, setView, remove, rename, duplicateResume, moveResume } = useStore();
+  const [renaming, setRenaming] = useState<{ kind: DocKind; id: string; title: string } | null>(null);
+  const [tailoring, setTailoring] = useState<{ source?: Resume } | null>(null);
   const t = useT();
   const [tab, setTab] = useState<"cvs" | "letters">("cvs");
   const [query, setQuery] = useState("");
@@ -475,6 +519,7 @@ export function Dashboard() {
             align="end"
             items={[
               { label: t.newCv, icon: "document", onClick: () => newResume() },
+              { label: t.newForJob, icon: "ai-rewrite", onClick: () => setTailoring({}) },
               { label: t.newCover, icon: "edit", onClick: () => newCover() },
               { label: t.newResign, icon: "archive", onClick: () => newResignation() },
             ]}
@@ -530,6 +575,8 @@ export function Dashboard() {
                         { label: t.moveLater, onClick: () => moveResume(r.id, 1) },
                       ]
                     : []),
+                  { label: t.tailor, icon: "ai-rewrite", onClick: () => setTailoring({ source: r }) },
+                  { label: t.rename, icon: "edit", onClick: () => setRenaming({ kind: "resume", id: r.id, title: r.title }) },
                   { label: t.duplicate, icon: "duplicate", onClick: () => duplicateResume(r.id) },
                   { label: t.downloadPdf, icon: "download", onClick: pdf },
                   { label: t.downloadWord, icon: "document", onClick: () => void exportResumeDocx(r) },
@@ -554,6 +601,7 @@ export function Dashboard() {
                   updatedAt={l.doc.updatedAt}
                   onOpen={() => setView({ page: "cover", id: l.doc.id })}
                   items={(pdf) => [
+                    { label: t.rename, icon: "edit", onClick: () => setRenaming({ kind: "cover", id: l.doc.id, title: l.doc.title }) },
                     { label: t.downloadPdf, icon: "download", onClick: pdf },
                     {
                       label: t.delete,
@@ -573,6 +621,7 @@ export function Dashboard() {
                   updatedAt={l.doc.updatedAt}
                   onOpen={() => setView({ page: "resignation", id: l.doc.id })}
                   items={(pdf) => [
+                    { label: t.rename, icon: "edit", onClick: () => setRenaming({ kind: "resignation", id: l.doc.id, title: l.doc.title }) },
                     { label: t.downloadPdf, icon: "download", onClick: pdf },
                     {
                       label: t.delete,
@@ -587,6 +636,14 @@ export function Dashboard() {
               ),
             )}
       </div>
+      {renaming ? (
+        <RenameDialog
+          title={renaming.title}
+          onSave={(title) => rename(renaming.kind, renaming.id, title)}
+          onClose={() => setRenaming(null)}
+        />
+      ) : null}
+      {tailoring ? <TailorDialog source={tailoring.source} onClose={() => setTailoring(null)} /> : null}
     </div>
   );
 }

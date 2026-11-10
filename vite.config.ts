@@ -37,7 +37,9 @@ async function handleAnthropic(req: IncomingMessage, res: ServerResponse) {
       headers: {
         "content-type": "application/json",
         "x-api-key": key,
-        "anthropic-version": "2023-06-01",
+        "anthropic-version": String(req.headers["anthropic-version"] ?? "2023-06-01"),
+        // Beta features (such as the refusal fallback used by CV tailoring) need their header passed on.
+        ...(req.headers["anthropic-beta"] ? { "anthropic-beta": String(req.headers["anthropic-beta"]) } : {}),
       },
       body,
     });

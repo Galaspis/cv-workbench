@@ -93,6 +93,8 @@ export type Resume = {
   sectionOrder: string[];
   hidden: string[];
   titles: Record<string, string>;
+  /** Set when Claude tailored this CV to a job: the job ad, what changed, and what the job wants that the CV doesn't show. */
+  tailoredFor?: { job: string; changes: string[]; missing: string[]; at: number };
 };
 
 export type CoverLetter = {

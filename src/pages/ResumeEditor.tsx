@@ -3,6 +3,7 @@ import { PreviewFrame } from "../components/PreviewFrame";
 import { EditorBar } from "../components/EditorBar";
 import { Icon, type IconName } from "../components/Icon";
 import { Field, Suggestion, Tabs, useT } from "../components/ui";
+import { TailorDialog, TailoredNote } from "../components/TailorDialog";
 import {
   improveSummary,
   parseResumeText,
@@ -174,6 +175,7 @@ function PersonalSection({ ctx, onDesign }: { ctx: Ctx; onDesign: () => void }) 
   const template = TEMPLATES.find((x) => x.id === resume.template);
   return (
     <>
+      <TailoredNote resume={resume} onHide={() => patch({ tailoredFor: undefined })} />
       <section className="panel">
         <SectionHead title={t.secPersonal} intro={t.introPersonal} />
         <div className="two">
@@ -512,12 +514,14 @@ function AtsSection({
   setJob,
   atsAi,
   setAtsAi,
+  onTailor,
 }: {
   ctx: Ctx;
   job: string;
   setJob: (v: string) => void;
   atsAi: AtsScoreResult | null;
   setAtsAi: (v: AtsScoreResult | null) => void;
+  onTailor: () => void;
 }) {
   const { resume, patch, t, busy, run, settings } = ctx;
   const ats = useMemo(() => analyzeAts(resume, job), [resume, job]);
@@ -571,6 +575,10 @@ function AtsSection({
         >
           <Icon name="add" size={18} />
           {t.addMissing}
+        </button>
+        <button type="button" className="btn soft" disabled={!!busy || !job.trim()} onClick={onTailor}>
+          <Icon name="ai-rewrite" size={18} />
+          {t.tailorThis}
         </button>
       </div>
 
@@ -833,6 +841,7 @@ export function ResumeEditor({ resume, intent }: { resume: Resume; intent?: "imp
   const [importOpen, setImportOpen] = useState(intent === "import");
   const [importText, setImportText] = useState("");
   const [largeOpen, setLargeOpen] = useState(false);
+  const [tailorOpen, setTailorOpen] = useState(false);
   const closeLarge = useCallback(() => setLargeOpen(false), []);
 
   const patch = (p: Partial<Resume>) => upsertResume({ ...resume, ...p });
@@ -1024,7 +1033,7 @@ export function ResumeEditor({ resume, intent }: { resume: Resume; intent?: "imp
         );
         break;
       case "ats":
-        body = <AtsSection ctx={ctx} job={job} setJob={setJob} atsAi={atsAi} setAtsAi={setAtsAi} />;
+        body = <AtsSection ctx={ctx} job={job} setJob={setJob} atsAi={atsAi} setAtsAi={setAtsAi} onTailor={() => setTailorOpen(true)} />;
         break;
       case "translate":
         body = <TranslateSection ctx={ctx} />;
@@ -1052,6 +1061,7 @@ export function ResumeEditor({ resume, intent }: { resume: Resume; intent?: "imp
           { label: t.txt, icon: "summary", onClick: () => exportTxt(resume) },
         ]}
         more={[
+          { label: t.tailor, icon: "ai-rewrite", onClick: () => setTailorOpen(true) },
           { label: t.largePreview, icon: "search", onClick: () => setLargeOpen(true) },
           { label: t.writeCover, icon: "edit", onClick: () => newCover(resume.id) },
           { label: t.importCv, icon: "upload", onClick: () => setImportOpen(true) },
@@ -1102,6 +1112,7 @@ export function ResumeEditor({ resume, intent }: { resume: Resume; intent?: "imp
       </div>
 
       {largeOpen ? <LargePreview resume={resume} onClose={closeLarge} onPdf={() => void pdf()} onWord={word} /> : null}
+      {tailorOpen ? <TailorDialog source={resume} initialJob={job} onClose={() => setTailorOpen(false)} /> : null}
 
       {importOpen ? (
         <div className="modal-back" onClick={() => setImportOpen(false)}>
