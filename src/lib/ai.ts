@@ -90,10 +90,15 @@ async function postAnthropic(
   if (!converted.length || converted[0].role !== "user") {
     converted.unshift({ role: "user", content: "Continue." });
   }
+  const model = claudeModel(settings.model);
+  // Older Claude models (Haiku 4.5 and earlier generations) accept temperature and answer without
+  // thinking. Newer ones (Sonnet 5.5, Opus 5.5, ...) reject temperature and think first, and that
+  // thinking counts toward max_tokens, so they get room for it.
+  const legacy = /haiku-4-5|sonnet-4-[56]|opus-4-[156]|claude-3/i.test(model);
   const payload = JSON.stringify({
-    model: claudeModel(settings.model),
-    max_tokens: (body.max_tokens as number) || 2048,
-    temperature: body.temperature ?? 0.4,
+    model,
+    max_tokens: legacy ? (body.max_tokens as number) || 2048 : Math.max((body.max_tokens as number) || 0, 16000),
+    ...(legacy ? { temperature: body.temperature ?? 0.4 } : {}),
     ...(system ? { system } : {}),
     messages: converted,
   });

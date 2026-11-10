@@ -364,9 +364,9 @@ export function SettingsPage() {
           <button
             className="chip"
             type="button"
-            onClick={() => setSettings({ baseUrl: "https://api.anthropic.com", model: "claude-sonnet-4-5" })}
+            onClick={() => setSettings({ baseUrl: "https://api.anthropic.com", model: "claude-sonnet-5-5" })}
           >
-            Claude Sonnet 4.5
+            Claude Sonnet 5.5
           </button>
         </div>
         <div className="row">
