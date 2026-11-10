@@ -104,7 +104,21 @@ function loadSettings(): Settings {
   try {
     const raw = localStorage.getItem(SETTINGS_KEY);
     if (!raw) return { ...DEFAULT_SETTINGS };
-    return { ...DEFAULT_SETTINGS, ...JSON.parse(raw) };
+    const saved = JSON.parse(raw) as Partial<Settings>;
+    const s: Settings = { ...DEFAULT_SETTINGS, ...saved };
+    // Before there were two key boxes, an OpenAI key lived in apiKey. Move it to its own box.
+    if (!saved.provider && s.apiKey && !s.apiKey.startsWith("sk-ant-")) {
+      return {
+        ...s,
+        provider: "openai",
+        openaiKey: s.apiKey,
+        openaiModel: /claude/i.test(saved.model ?? "") ? "" : saved.model ?? "",
+        apiKey: "",
+        baseUrl: DEFAULT_SETTINGS.baseUrl,
+        model: DEFAULT_SETTINGS.model,
+      };
+    }
+    return s;
   } catch {
     return { ...DEFAULT_SETTINGS };
   }
@@ -241,6 +255,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           ...patch,
           ...(patch.apiKey !== undefined ? { apiKey: patch.apiKey.trim().replace(/^Bearer\s+/i, "").replace(/^["']+|["']+$/g, "").replace(/\s+/g, "") } : {}),
           ...(patch.model !== undefined ? { model: patch.model.trim() } : {}),
+          ...(patch.openaiKey !== undefined ? { openaiKey: patch.openaiKey.trim().replace(/^Bearer\s+/i, "").replace(/^["']+|["']+$/g, "").replace(/\s+/g, "") } : {}),
+          ...(patch.openaiModel !== undefined ? { openaiModel: patch.openaiModel.trim() } : {}),
           ...(patch.baseUrl !== undefined ? { baseUrl: patch.baseUrl.trim() } : {}),
         })),
       upsertResume: (resume) =>

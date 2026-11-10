@@ -57,9 +57,42 @@ async function handleAnthropic(req: IncomingMessage, res: ServerResponse) {
   }
 }
 
+// Same idea for OpenAI: the browser calls /openai-api/..., this forwards it with only the headers it needs.
+async function handleOpenAi(req: IncomingMessage, res: ServerResponse) {
+  if (req.method === "OPTIONS") {
+    res.statusCode = 204;
+    res.end();
+    return;
+  }
+  const body = req.method === "GET" || req.method === "HEAD" ? undefined : await readBody(req);
+  try {
+    const upstream = await fetch(`https://api.openai.com${req.url ?? "/"}`, {
+      method: req.method ?? "POST",
+      headers: {
+        "content-type": String(req.headers["content-type"] ?? "application/json"),
+        authorization: String(req.headers.authorization ?? ""),
+      },
+      body,
+    });
+    const text = await upstream.text();
+    console.log(`[openai-proxy] ${req.method} ${req.url} → ${upstream.status}`);
+    res.statusCode = upstream.status;
+    res.setHeader("content-type", upstream.headers.get("content-type") || "application/json");
+    res.end(text);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    res.statusCode = 502;
+    res.setHeader("content-type", "application/json");
+    res.end(JSON.stringify({ error: { type: "proxy_error", message } }));
+  }
+}
+
 function attachAnthropicProxy(server: ViteDevServer) {
   server.middlewares.use("/anthropic-api", (req, res) => {
     void handleAnthropic(req, res);
+  });
+  server.middlewares.use("/openai-api", (req, res) => {
+    void handleOpenAi(req, res);
   });
 }
 

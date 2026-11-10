@@ -225,7 +225,10 @@ export function demoResume(): Resume {
 
 export const DEFAULT_SETTINGS: Settings = {
   apiKey: "",
-  baseUrl: "https://api.openai.com/v1",
-  model: "gpt-4o-mini",
+  baseUrl: "https://api.anthropic.com",
+  model: "claude-haiku-4-5-20251001",
   uiLang: "he",
+  provider: "anthropic",
+  openaiKey: "",
+  openaiModel: "",
 };

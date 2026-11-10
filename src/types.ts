@@ -133,10 +133,16 @@ export type ResignationLetter = {
 };
 
 export type Settings = {
+  /** Anthropic (Claude) API key. */
   apiKey: string;
   baseUrl: string;
+  /** Claude model for everyday AI features. */
   model: string;
   uiLang: "en" | "he";
+  /** Which provider the AI features use, tailoring included. */
+  provider: "anthropic" | "openai";
+  openaiKey: string;
+  openaiModel: string;
 };
 
 export type AppView =

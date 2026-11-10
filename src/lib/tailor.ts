@@ -1,13 +1,17 @@
-// Tailor a CV to a job ad with Claude, through the official Anthropic SDK.
+// Tailor a CV to a job ad with Claude (official Anthropic SDK) or OpenAI (official OpenAI SDK),
+// whichever provider is chosen in Settings.
 // Two modes: rewrite an existing CV for a job (facts stay, wording and emphasis change), or build a new
 // CV for a job from pasted text (an old CV, a LinkedIn profile, notes). Claude returns structured JSON
 // checked against the schema below; facts such as employers, titles and dates are copied from the
 // original CV by code, not taken from the model.
 import Anthropic from "@anthropic-ai/sdk";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
+import OpenAI from "openai";
+import { zodResponseFormat } from "openai/helpers/zod";
 import { z } from "zod";
 import { createLocalizedResume, uid } from "../factory";
 import type { Resume, Settings } from "../types";
+import { OPENAI_BASE } from "./ai";
 
 /** A strong model, as Gal asked; tailoring is worth it and runs a few times a week. */
 export const TAILOR_MODEL = "claude-opus-5-5";
@@ -63,7 +67,7 @@ Rules:
 - In "changes", explain what you changed for this job in plain words. In "missing", list job requirements the material does not show, so the candidate can add them only if they are true.
 - Leave a field as an empty string when the material does not give it.`;
 
-function client(settings: Settings) {
+function claudeClient(settings: Settings) {
   const apiKey = settings.apiKey.trim();
   if (!apiKey.startsWith("sk-ant-")) {
     throw new TailorError("Tailoring uses Claude. Add an Anthropic API key (sk-ant-…) in Settings.");
@@ -95,8 +99,38 @@ function cvAsText(resume: Resume) {
   );
 }
 
+async function askOpenAi(settings: Settings, userText: string): Promise<TailoredCv> {
+  const apiKey = settings.openaiKey.trim();
+  if (!apiKey) throw new TailorError("Add an OpenAI API key in Settings, or switch the AI provider to Claude.");
+  const model = settings.openaiModel.trim();
+  if (!model) throw new TailorError("Choose an OpenAI model in Settings.");
+  const openai = new OpenAI({ apiKey, baseURL: OPENAI_BASE(), dangerouslyAllowBrowser: true, maxRetries: 1 });
+  let completion;
+  try {
+    completion = await openai.chat.completions.parse({
+      model,
+      messages: [
+        { role: "system", content: SYSTEM },
+        { role: "user", content: userText },
+      ],
+      response_format: zodResponseFormat(Tailored, "tailored_cv"),
+    });
+  } catch (e) {
+    if (e instanceof OpenAI.AuthenticationError) throw new TailorError("OpenAI rejected the API key. Check it in Settings.");
+    if (e instanceof OpenAI.RateLimitError) throw new TailorError("OpenAI: too many requests or no credit left. Wait a minute or check your billing.");
+    if (e instanceof OpenAI.APIError) throw new TailorError(`OpenAI could not tailor the CV (${e.status ?? "network"}): ${e.message}`);
+    throw e;
+  }
+  const choice = completion.choices[0];
+  if (choice?.message.refusal) throw new TailorError("OpenAI declined this request. Try rewording the job ad.");
+  if (choice?.finish_reason === "length") throw new TailorError("The CV was too long to tailor in one go. Shorten the pasted text and try again.");
+  if (!choice?.message.parsed) throw new TailorError("OpenAI's answer could not be read. Try again.");
+  return choice.message.parsed;
+}
+
 async function ask(settings: Settings, userText: string): Promise<TailoredCv> {
-  const anthropic = client(settings);
+  if (settings.provider === "openai") return askOpenAi(settings, userText);
+  const anthropic = claudeClient(settings);
   let response;
   try {
     response = await anthropic.beta.messages.parse({

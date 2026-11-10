@@ -207,7 +207,16 @@ const en = {
   notShownHint: "Add these only if they are true.",
   viewJob: "Show the job ad",
   dismiss: "Hide",
-  tailorKeyNote: "Tailoring always uses Claude Opus 5.5 with this key, whatever model is set below.",
+  tailorKeyNote: "All AI features use your Claude key. Tailoring always uses Claude Opus 5.5; the model below is for everything else.",
+  aiProvider: "AI features use",
+  tailorNoteOpenAi: "All AI features use your OpenAI key and the OpenAI model below, tailoring included.",
+  claudeKey: "Claude API key",
+  openaiKey: "OpenAI API key",
+  openaiModelPh: "Choose or type a model",
+  loadModels: "Load my models",
+  loadingModels: "Loading…",
+  modelsLoaded: "{n} models found. Pick one in the model box.",
+  noModels: "No chat models found for this key.",
 
   // busy messages
   busyRewrite: "Rewriting…",
@@ -243,7 +252,7 @@ const en = {
   // settings
   aiTitle: "AI",
   aiHelp:
-    "Paste an API key from Anthropic (sk-ant-…) or any OpenAI-compatible provider. The key stays in this browser. Haiku is enough for everyday ATS scoring.",
+    "Add a key for Claude, OpenAI or both, then choose which one the AI features use. Keys stay in this browser and are never synced.",
   apiKey: "API key",
   baseUrl: "Base URL",
   model: "Model",
@@ -453,7 +462,16 @@ const he: Strings = {
   notShownHint: "הוסיפו רק אם זה נכון.",
   viewJob: "הצגת מודעת הדרושים",
   dismiss: "הסתרה",
-  tailorKeyNote: "ההתאמה למשרה משתמשת תמיד ב-Claude Opus 5.5 עם המפתח הזה, בלי קשר למודל שנבחר למטה.",
+  tailorKeyNote: "כל פיצ׳רי ה-AI משתמשים במפתח Claude. ההתאמה למשרה משתמשת תמיד ב-Claude Opus 5.5; המודל למטה משמש לכל השאר.",
+  aiProvider: "פיצ׳רי ה-AI משתמשים ב",
+  tailorNoteOpenAi: "כל פיצ׳רי ה-AI משתמשים במפתח OpenAI ובמודל שנבחר למטה, כולל ההתאמה למשרה.",
+  claudeKey: "מפתח API של Claude",
+  openaiKey: "מפתח API של OpenAI",
+  openaiModelPh: "בחרו או הקלידו מודל",
+  loadModels: "טעינת המודלים שלי",
+  loadingModels: "טוען…",
+  modelsLoaded: "נמצאו {n} מודלים. בחרו אחד בתיבת המודל.",
+  noModels: "לא נמצאו מודלי צ׳אט למפתח הזה.",
 
   busyRewrite: "משפר ניסוח…",
   busySuggest: "מציע הישגים…",
@@ -485,7 +503,7 @@ const he: Strings = {
 
   aiTitle: "בינה מלאכותית",
   aiHelp:
-    "הדביקו מפתח API של Anthropic ‏(sk-ant-…) או של כל ספק תואם OpenAI. המפתח נשמר רק בדפדפן הזה. Haiku מספיק לבדיקות ATS יומיומיות.",
+    "הוסיפו מפתח של Claude, של OpenAI או של שניהם, ובחרו במי משתמשים פיצ׳רי ה-AI. המפתחות נשמרים רק בדפדפן הזה ולא מסונכרנים.",
   apiKey: "מפתח API",
   baseUrl: "כתובת בסיס",
   model: "מודל",

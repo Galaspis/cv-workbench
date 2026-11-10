@@ -19,13 +19,36 @@ function keyHint(apiKey: string) {
 }
 
 function readySettings(settings: Settings) {
-  const apiKey = cleanApiKey(settings.apiKey);
-  const model = settings.model.trim() || "gpt-4o-mini";
-  const base = settings.baseUrl.trim().replace(/\/$/, "") || "https://api.openai.com/v1";
-  if (!apiKey) {
-    throw new AiError("Add an API key in Settings to use AI features.");
+  if (settings.provider === "openai") {
+    const apiKey = cleanApiKey(settings.openaiKey);
+    if (!apiKey) throw new AiError("Add an OpenAI API key in Settings, or switch the AI provider to Claude.");
+    const model = settings.openaiModel.trim();
+    if (!model) throw new AiError("Choose an OpenAI model in Settings (Load my models lists the ones your key can use).");
+    return { apiKey, model, base: OPENAI_BASE(), anthropic: false };
   }
-  return { apiKey, model, base, anthropic: apiKey.startsWith("sk-ant-") || /anthropic/i.test(base) };
+  const apiKey = cleanApiKey(settings.apiKey);
+  if (!apiKey) throw new AiError("Add a Claude API key in Settings, or switch the AI provider to OpenAI.");
+  return { apiKey, model: claudeModel(settings.model), base: "https://api.anthropic.com", anthropic: true };
+}
+
+/** OpenAI requests go through this site's own relay (see deploy/cv.caddy), never straight from the browser. */
+export const OPENAI_BASE = () => `${window.location.origin}/openai-api/v1`;
+
+/** OpenAI's older chat models accept temperature; the reasoning models (o-series, GPT-5 family) reject it. */
+function openaiLegacy(model: string) {
+  return /^(gpt-4|gpt-3\.5|chatgpt-4o)/i.test(model);
+}
+
+/** Lists the chat models this OpenAI key can use, newest first. */
+export async function listOpenAiModels(apiKey: string): Promise<string[]> {
+  const res = await fetch(`${OPENAI_BASE()}/models`, { headers: { Authorization: `Bearer ${cleanApiKey(apiKey)}` } });
+  if (!res.ok) throw new AiError(formatApiError(res.status, await res.text()));
+  const data = (await res.json()) as { data?: { id: string; created?: number }[] };
+  return (data.data ?? [])
+    .filter((m) => /^(gpt-|o\d|chatgpt-)/i.test(m.id))
+    .filter((m) => !/(audio|realtime|transcribe|tts|image|search|embedding|instruct|moderation)/i.test(m.id))
+    .sort((a, b) => (b.created ?? 0) - (a.created ?? 0))
+    .map((m) => m.id);
 }
 
 function formatApiError(status: number, text: string) {
@@ -138,13 +161,20 @@ async function postChat(
 ): Promise<{ choices?: { message?: { content?: string } }[] }> {
   const { apiKey, model, base, anthropic } = readySettings(settings);
   if (anthropic) return postAnthropic(settings, body);
+  // Reasoning models reject temperature and take max_completion_tokens (which also covers their
+  // hidden reasoning, so they need far more room than the visible answer).
+  const { temperature, max_tokens, ...rest } = body;
+  const legacy = openaiLegacy(model);
+  const request = legacy
+    ? { model, ...rest, ...(temperature !== undefined ? { temperature } : {}), ...(max_tokens ? { max_tokens } : {}) }
+    : { model, ...rest, max_completion_tokens: Math.max(Number(max_tokens) || 0, 16000) };
   const res = await fetch(`${base}/chat/completions`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${apiKey}`,
     },
-    body: JSON.stringify({ model, ...body }),
+    body: JSON.stringify(request),
   });
   if (!res.ok) {
     throw new AiError(formatApiError(res.status, await res.text()));

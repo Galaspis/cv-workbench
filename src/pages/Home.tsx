@@ -6,7 +6,7 @@ import { EditorBar } from "../components/EditorBar";
 import { Icon } from "../components/Icon";
 import { Field, Menu, Tabs, useT } from "../components/ui";
 import { exportLetterDocx, exportPreviewPdf, exportResumeDocx, exportTxt } from "../lib/export";
-import { generateCoverLetter, generateResignation, pingAi } from "../lib/ai";
+import { generateCoverLetter, generateResignation, listOpenAiModels, pingAi } from "../lib/ai";
 import { useStore } from "../store";
 import { SEED_IDS } from "../data/seedResumes";
 import { ACCENTS, BODY_FONTS, TEMPLATES, TITLE_FONTS } from "../types";
@@ -303,6 +303,21 @@ export function SettingsPage() {
   const [testBusy, setTestBusy] = useState(false);
   const [testOk, setTestOk] = useState(false);
   const [showKey, setShowKey] = useState(false);
+  const [showOpenAiKey, setShowOpenAiKey] = useState(false);
+  const [models, setModels] = useState<string[]>([]);
+  const [modelsMsg, setModelsMsg] = useState("");
+
+  async function loadModels() {
+    setModelsMsg(t.loadingModels);
+    try {
+      const list = await listOpenAiModels(settings.openaiKey);
+      setModels(list);
+      setModelsMsg(list.length ? t.modelsLoaded.replace("{n}", String(list.length)) : t.noModels);
+      if (!settings.openaiModel && list[0]) setSettings({ openaiModel: list[0] });
+    } catch (e) {
+      setModelsMsg(e instanceof Error ? e.message : t.failed);
+    }
+  }
 
   async function testConnection() {
     setTestBusy(true);
@@ -326,52 +341,107 @@ export function SettingsPage() {
       <section className="panel">
         <h2 className="section-title">{t.aiTitle}</h2>
         <p className="lede">{t.aiHelp}</p>
-        <p className="lede">{t.tailorKeyNote}</p>
-        <label className="field">
-          <span className="field-label">{t.apiKey}</span>
-          <span className="secret-field">
-            <input
-              type={showKey ? "text" : "password"}
-              value={settings.apiKey}
-              autoComplete="off"
-              spellCheck={false}
-              dir="ltr"
-              onChange={(e) => {
-                const apiKey = e.target.value;
-                const patch: Partial<typeof settings> = { apiKey };
-                if (apiKey.trim().startsWith("sk-ant-")) {
-                  patch.baseUrl = "https://api.anthropic.com";
-                  if (!/claude/i.test(settings.model)) patch.model = "claude-haiku-4-5-20251001";
-                }
-                setSettings(patch);
-              }}
-            />
-            <button type="button" className="btn ghost" onClick={() => setShowKey((v) => !v)}>
-              {showKey ? t.hideKey : t.showKey}
-            </button>
-          </span>
-        </label>
-        <Field label={t.baseUrl} dir="ltr" value={settings.baseUrl} onChange={(baseUrl) => setSettings({ baseUrl })} />
-        <Field label={t.model} dir="ltr" value={settings.model} onChange={(model) => setSettings({ model })} />
-        <div className="chip-row">
+
+        <p className="field-label">{t.aiProvider}</p>
+        <div className="seg">
           <button
-            className="chip"
             type="button"
-            onClick={() => setSettings({ baseUrl: "https://api.anthropic.com", model: "claude-haiku-4-5-20251001" })}
+            className={settings.provider === "anthropic" ? "active" : ""}
+            onClick={() => {
+              setSettings({ provider: "anthropic" });
+              setTestMsg("");
+            }}
           >
-            Claude Haiku 4.5
+            Claude
           </button>
           <button
-            className="chip"
             type="button"
-            onClick={() => setSettings({ baseUrl: "https://api.anthropic.com", model: "claude-sonnet-5-5" })}
+            className={settings.provider === "openai" ? "active" : ""}
+            onClick={() => {
+              setSettings({ provider: "openai" });
+              setTestMsg("");
+            }}
           >
-            Claude Sonnet 5.5
+            OpenAI
           </button>
         </div>
+        <p className="lede">{settings.provider === "openai" ? t.tailorNoteOpenAi : t.tailorKeyNote}</p>
+
+        <div className={`provider-box ${settings.provider === "anthropic" ? "active" : ""}`}>
+          <h3 className="panel-title">Claude</h3>
+          <label className="field">
+            <span className="field-label">{t.claudeKey}</span>
+            <span className="secret-field">
+              <input
+                type={showKey ? "text" : "password"}
+                value={settings.apiKey}
+                placeholder="sk-ant-…"
+                autoComplete="off"
+                spellCheck={false}
+                dir="ltr"
+                onChange={(e) => setSettings({ apiKey: e.target.value })}
+              />
+              <button type="button" className="btn ghost" onClick={() => setShowKey((v) => !v)}>
+                {showKey ? t.hideKey : t.showKey}
+              </button>
+            </span>
+          </label>
+          <Field label={t.model} dir="ltr" value={settings.model} onChange={(model) => setSettings({ model })} />
+          <div className="chip-row">
+            <button className="chip" type="button" onClick={() => setSettings({ model: "claude-haiku-4-5-20251001" })}>
+              Claude Haiku 4.5
+            </button>
+            <button className="chip" type="button" onClick={() => setSettings({ model: "claude-sonnet-5-5" })}>
+              Claude Sonnet 5.5
+            </button>
+          </div>
+        </div>
+
+        <div className={`provider-box ${settings.provider === "openai" ? "active" : ""}`}>
+          <h3 className="panel-title">OpenAI</h3>
+          <label className="field">
+            <span className="field-label">{t.openaiKey}</span>
+            <span className="secret-field">
+              <input
+                type={showOpenAiKey ? "text" : "password"}
+                value={settings.openaiKey}
+                placeholder="sk-…"
+                autoComplete="off"
+                spellCheck={false}
+                dir="ltr"
+                onChange={(e) => setSettings({ openaiKey: e.target.value })}
+              />
+              <button type="button" className="btn ghost" onClick={() => setShowOpenAiKey((v) => !v)}>
+                {showOpenAiKey ? t.hideKey : t.showKey}
+              </button>
+            </span>
+          </label>
+          <label className="field">
+            <span className="field-label">{t.model}</span>
+            <input
+              list="openai-models"
+              dir="ltr"
+              value={settings.openaiModel}
+              placeholder={t.openaiModelPh}
+              onChange={(e) => setSettings({ openaiModel: e.target.value })}
+            />
+            <datalist id="openai-models">
+              {models.map((m) => (
+                <option key={m} value={m} />
+              ))}
+            </datalist>
+          </label>
+          <div className="row">
+            <button type="button" className="btn outline" onClick={loadModels} disabled={!settings.openaiKey.trim()}>
+              {t.loadModels}
+            </button>
+            {modelsMsg ? <span className="hint-text inline">{modelsMsg}</span> : null}
+          </div>
+        </div>
+
         <div className="row">
           <button className="btn primary" onClick={testConnection} disabled={testBusy}>
-            {testBusy ? t.testing : t.test}
+            {testBusy ? t.testing : `${t.test} (${settings.provider === "openai" ? "OpenAI" : "Claude"})`}
           </button>
         </div>
         {testMsg ? <p className={`status ${testOk ? "ok" : "err"}`}>{testMsg}</p> : null}
