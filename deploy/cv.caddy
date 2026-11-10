@@ -43,6 +43,10 @@ korot.gallab.top {
                 header_up -Remote-Name
                 header_up -Remote-Groups
                 header_up -Cookie
+                # Browser headers: with them Anthropic treats the call as coming straight from a web
+                # page and refuses it ("CORS requests must set anthropic-dangerous-direct-browser-access").
+                header_up -Origin
+                header_up -Referer
             }
         }
 
